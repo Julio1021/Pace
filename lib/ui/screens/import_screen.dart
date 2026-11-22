@@ -48,10 +48,12 @@ class _ImportScreenState extends State<ImportScreen> {
       items,
       weightKg: app.profile.weightForCalc,
       onProgress: (d, t) {
-        if (mounted) setState(() {
-          _done = d;
-          _total = t;
-        });
+        if (mounted) {
+          setState(() {
+            _done = d;
+            _total = t;
+          });
+        }
       },
     );
     await app.reload();
