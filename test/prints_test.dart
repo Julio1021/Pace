@@ -44,6 +44,11 @@ Future<void> _loadFonts() async {
   }
   await roboto.load();
   await icons.load();
+  final sg = FontLoader('SpaceGrotesk');
+  for (final f in ['assets/fonts/SpaceGrotesk-Medium.ttf', 'assets/fonts/SpaceGrotesk-Bold.ttf']) {
+    sg.addFont(File(f).readAsBytes().then((b) => ByteData.view(b.buffer)));
+  }
+  await sg.load();
 }
 
 class _Env {

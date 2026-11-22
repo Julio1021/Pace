@@ -499,7 +499,7 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: p.mint,
-              boxShadow: [BoxShadow(color: p.mint.withValues(alpha: 0.45), blurRadius: 36, offset: const Offset(0, 16))],
+              boxShadow: [BoxShadow(color: p.mint.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 10))],
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
