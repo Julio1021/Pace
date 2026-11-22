@@ -48,7 +48,7 @@ class GuaraArt {
 <path d="M28 132 Q12 126 20 110 Q30 124 44 124" fill="#E8762E"/><path d="M20 110 Q18 104 24 102 Q26 108 27 112z" fill="#fff"/>
 <path d="M50 140 h36" stroke="#1F1A17" stroke-width="8" stroke-linecap="round"/><path d="M96 142 h24" stroke="#1F1A17" stroke-width="8" stroke-linecap="round"/>
 <path d="M118 138 h16 a4 4 0 0 1 4 9 h-20z" fill="#12B886"/>
-<text x="118" y="58" font-size="16" font-weight="700" fill="#94A3B8">z</text><text x="130" y="44" font-size="12" font-weight="700" fill="#94A3B8">z</text><g transform="translate(80 84) rotate(-8)"><path d="M-6 22 L-14 -18 L8 6z" fill="#E8762E"/><path d="M-9 14 L-12 -8 L2 6z" fill="#FDF3E7" fill-opacity=".85"/>
+<path d="M114 46 h10 l-10 12 h10" fill="none" stroke="#94A3B8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M128 32 h7 l-7 9 h7" fill="none" stroke="#94A3B8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(80 84) rotate(-8)"><path d="M-6 22 L-14 -18 L8 6z" fill="#E8762E"/><path d="M-9 14 L-12 -8 L2 6z" fill="#FDF3E7" fill-opacity=".85"/>
 <path d="M22 20 L34 -16 L38 14z" fill="#E8762E"/><path d="M26 14 L33 -6 L34 12z" fill="#FDF3E7" fill-opacity=".85"/>
 <ellipse cx="14" cy="34" rx="26" ry="22" fill="#E8762E"/>
 <path d="M14 40 Q34 38 50 46 Q46 56 30 56 Q16 54 14 40z" fill="#FDF3E7"/>
