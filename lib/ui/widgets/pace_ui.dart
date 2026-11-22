@@ -567,3 +567,90 @@ class YearMosaic extends StatelessWidget {
     });
   }
 }
+
+/// Fundo "Degradê vivo": manchas de menta, azul-céu, lilás e pêssego se
+/// fundindo e se movendo devagar atrás dos cartões de vidro.
+class MeshBackground extends StatefulWidget {
+  final double height;
+  const MeshBackground({super.key, this.height = 720});
+
+  @override
+  State<MeshBackground> createState() => _MeshBackgroundState();
+}
+
+class _MeshBackgroundState extends State<MeshBackground> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 18));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (motionOn(context)) {
+      if (!_c.isAnimating) _c.repeat();
+    } else {
+      _c.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SizedBox(
+        height: widget.height,
+        width: double.infinity,
+        child: RepaintBoundary(
+          child: ImageFiltered(
+            imageFilter: ui.ImageFilter.blur(sigmaX: 48, sigmaY: 48, tileMode: TileMode.decal),
+            child: AnimatedBuilder(
+              animation: _c,
+              builder: (context, _) => CustomPaint(painter: _MeshPainter(_c.value)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MeshPainter extends CustomPainter {
+  final double t;
+  _MeshPainter(this.t);
+
+  static const _blobs = [
+    (color: Color(0xFF8EE6C4), x: 0.05, y: 0.04, r: 0.42, ax: 0.16, ay: 0.08, ph: 0.0, a: 0.75),
+    (color: Color(0xFFA9C9FF), x: 0.95, y: 0.08, r: 0.38, ax: -0.18, ay: 0.07, ph: 1.7, a: 0.55),
+    (color: Color(0xFFD8C8FF), x: 0.9, y: 0.48, r: 0.36, ax: -0.12, ay: -0.1, ph: 3.1, a: 0.55),
+    (color: Color(0xFFFFD6BC), x: 0.08, y: 0.6, r: 0.34, ax: 0.14, ay: -0.08, ph: 4.4, a: 0.5),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final w = s.width;
+    final ang = t * 2 * math.pi;
+    for (final b in _blobs) {
+      final cx = (b.x + b.ax * math.sin(ang + b.ph)) * w;
+      final cy = (b.y + b.ay * math.cos(ang * 1.3 + b.ph)) * s.height;
+      final r = b.r * w * (1 + 0.1 * math.sin(ang * 0.7 + b.ph));
+      canvas.drawCircle(Offset(cx, cy), r, Paint()..color = b.color.withValues(alpha: b.a));
+    }
+    // Some suavemente para a cor de fundo na parte de baixo.
+    final fade = Rect.fromLTWH(0, s.height * 0.55, w, s.height * 0.45);
+    canvas.drawRect(
+      fade,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x00F4F6F9), PaceColors.bgLight],
+        ).createShader(fade),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MeshPainter o) => o.t != t;
+}

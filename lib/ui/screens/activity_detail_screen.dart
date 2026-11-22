@@ -16,6 +16,7 @@ import '../../domain/models.dart';
 import '../../state/app_state.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
+import '../widgets/guara.dart';
 import '../widgets/route_widgets.dart';
 
 class ActivityDetailScreen extends StatefulWidget {
@@ -214,9 +215,18 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 color: Pal.of(context).mintSoft,
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, color: Pal.of(context).mintText),
+                    const Guara(pose: GuaraPose.celebrate, size: 92),
                     const SizedBox(width: 10),
-                    const Expanded(child: Text('Muito bem! Sua corrida foi salva no histórico.')),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Mandou bem!', style: numStyle(20, color: Pal.of(context).ink)),
+                          const SizedBox(height: 2),
+                          const Text('Sua corrida foi salva no histórico.'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

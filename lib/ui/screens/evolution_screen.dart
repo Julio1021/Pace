@@ -7,6 +7,7 @@ import '../../domain/stats.dart';
 import '../../state/app_state.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
+import '../widgets/guara.dart';
 import '../widgets/pace_ui.dart';
 
 enum EvoPeriod { d7, d30, d90, m12, all }
@@ -81,6 +82,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
           ? const Center(
               child: EmptyState(
                 icon: Icons.insights,
+                art: Guara(pose: GuaraPose.sleep, size: 150),
                 title: 'Sem dados ainda',
                 message: 'Grave ou importe corridas para acompanhar sua evolução.',
               ),

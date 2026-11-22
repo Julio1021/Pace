@@ -171,12 +171,6 @@ void main() {
     await _shot(tester, '02-inicio', height: 1700);
   }, skip: !_enabled);
 
-  testWidgets('03 início escuro', (tester) async {
-    final env = await _makeEnv(tester);
-    await tester.pumpWidget(_wrap(env, const HomeShell(), mode: ThemeMode.dark));
-    await _shot(tester, '03-inicio-escuro', height: 1700);
-  }, skip: !_enabled);
-
   testWidgets('04 histórico', (tester) async {
     final env = await _makeEnv(tester);
     await tester.pumpWidget(_wrap(env, const HomeShell()));
@@ -240,12 +234,17 @@ void main() {
     await _shot(tester, '10-corrida');
   }, skip: !_enabled);
 
-  testWidgets('12 correr escuro', (tester) async {
+  testWidgets('03 corrida salva', (tester) async {
     final env = await _makeEnv(tester);
-    await tester.pumpWidget(_wrap(env, const HomeShell(), mode: ThemeMode.dark));
-    await _settle(tester);
-    await _tab(tester, 'Correr');
-    await _shot(tester, '12-correr-escuro', height: 1000);
+    final id = env.app.activities.first.id!;
+    await tester.pumpWidget(_wrap(env, ActivityDetailScreen(activityId: id, justFinished: true)));
+    await _shot(tester, '03-corrida-salva', height: 1200);
+  }, skip: !_enabled);
+
+  testWidgets('12 início vazio', (tester) async {
+    final env = await _makeEnv(tester, withData: false);
+    await tester.pumpWidget(_wrap(env, const HomeShell()));
+    await _shot(tester, '12-inicio-vazio');
   }, skip: !_enabled);
 
   testWidgets('11 importar', (tester) async {

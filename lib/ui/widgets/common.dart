@@ -147,7 +147,17 @@ class EmptyState extends StatelessWidget {
   final String message;
   final List<Widget> actions;
 
-  const EmptyState({super.key, required this.icon, required this.title, required this.message, this.actions = const []});
+  /// Ilustração no lugar do ícone (ex.: o mascote).
+  final Widget? art;
+
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actions = const [],
+    this.art,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -157,12 +167,13 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(icon, size: 36, color: cs.primary),
-          ),
+          art ??
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: Icon(icon, size: 36, color: cs.primary),
+              ),
           const SizedBox(height: 16),
           Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),

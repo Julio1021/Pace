@@ -8,6 +8,7 @@ import '../../domain/stats.dart';
 import '../../state/app_state.dart';
 import '../shell.dart';
 import '../widgets/charts.dart';
+import '../widgets/guara.dart';
 import '../widgets/common.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/route_widgets.dart';
@@ -29,7 +30,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          if (last != null) Positioned(top: 90, left: 0, right: 0, child: RouteBackground(points: last.previewPoints, height: 600)),
+          const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 720)),
           SafeArea(
             bottom: false,
             child: RefreshIndicator(
@@ -131,6 +132,7 @@ class HomeScreen extends StatelessWidget {
     if (days >= 7) out.add('Sua última corrida foi há $days dias. Que tal uma rodagem leve hoje?');
     if (out.isEmpty) return const [];
     final p = Pal.of(context);
+    final rest = week.count > 0 && left <= 0;
     return [
       Container(
         padding: const EdgeInsets.all(14),
@@ -149,12 +151,15 @@ class HomeScreen extends StatelessWidget {
                 padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
                 child: Row(
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12)),
-                      child: Icon(Icons.trending_up_rounded, color: p.mintText, size: 20),
-                    ),
+                    if (i == 0 && rest)
+                      const Guara(pose: GuaraPose.sleep, size: 64)
+                    else
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12)),
+                        child: Icon(Icons.trending_up_rounded, color: p.mintText, size: 20),
+                      ),
                     const SizedBox(width: 12),
                     Expanded(child: Text(out[i], style: TextStyle(fontSize: 14, height: 1.35, color: p.ink))),
                   ],
@@ -173,6 +178,7 @@ class _EmptyHome extends StatelessWidget {
     return GlassCard(
       child: EmptyState(
         icon: Icons.directions_run_rounded,
+        art: const Guara(pose: GuaraPose.run, size: 150),
         title: 'Sua primeira corrida começa aqui',
         message: 'Grave uma corrida com o GPS ou importe seu histórico de outros apps (.tcx ou .gpx).',
         actions: [

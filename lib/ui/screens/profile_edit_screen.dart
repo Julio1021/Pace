@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/format.dart';
 import '../../domain/models.dart';
 import '../../state/app_state.dart';
+import '../widgets/guara.dart';
 
 /// Criação e edição do perfil do corredor. Na primeira abertura funciona como boas-vindas.
 class ProfileEditScreen extends StatefulWidget {
@@ -100,21 +101,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
               if (widget.onboarding) ...[
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(16)),
-                      child: const Icon(Icons.directions_run, color: Colors.white, size: 32),
-                    ),
-                    const SizedBox(width: 14),
-                    Text('PACE', style: t.headlineMedium?.copyWith(letterSpacing: 2)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Text('Bem-vindo! Vamos criar seu perfil de corredor.', style: t.titleLarge),
+                const SizedBox(height: 8),
+                const Center(child: Guara(pose: GuaraPose.wave, size: 170)),
+                const SizedBox(height: 8),
+                Center(child: Text('PACE', style: t.headlineMedium?.copyWith(letterSpacing: 4, color: cs.primary))),
+                const SizedBox(height: 16),
+                Text('Oi! Eu sou o Guará. Vamos criar seu perfil de corredor?', style: t.titleLarge),
                 const SizedBox(height: 6),
                 Text(
                   'O peso é usado para estimar calorias e a meta semanal aparece no início. '

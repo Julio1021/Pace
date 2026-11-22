@@ -33,6 +33,16 @@ def main():
     shutil.copy(PLAT / "AndroidManifest.xml", app / "src" / "main" / "AndroidManifest.xml")
     done("AndroidManifest.xml (GPS, serviço em primeiro plano, notificações)")
 
+    res_src = PLAT / "res"
+    if res_src.exists():
+        res_dst = app / "src" / "main" / "res"
+        for f in res_src.rglob("*"):
+            if f.is_file():
+                dst = res_dst / f.relative_to(res_src)
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy(f, dst)
+        done("ícone do app (Guará)")
+
     kts = app / "build.gradle.kts"
     groovy = app / "build.gradle"
     signing = bool(STORE and STORE_PASS and pathlib.Path(STORE).exists())

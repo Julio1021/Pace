@@ -9,6 +9,7 @@ import '../../state/app_state.dart';
 import '../shell.dart';
 import '../widgets/activity_tile.dart';
 import '../widgets/common.dart';
+import '../widgets/guara.dart';
 import 'activity_detail_screen.dart';
 import 'import_screen.dart';
 
@@ -107,6 +108,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: SingleChildScrollView(
                 child: EmptyState(
                   icon: Icons.history,
+                  art: const Guara(pose: GuaraPose.run, size: 150),
                   title: 'Nenhuma corrida ainda',
                   message: 'As corridas gravadas e importadas aparecem aqui, organizadas por mês.',
                   actions: [
