@@ -652,13 +652,21 @@ class _Banner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+        boxShadow: const [BoxShadow(color: Color(0x220F172A), blurRadius: 14, offset: Offset(0, 6))],
+      ),
       child: Row(
         children: [
           Icon(icon, color: color),
           const SizedBox(width: 10),
-          Expanded(child: Text(text)),
-          TextButton(onPressed: onTap, child: Text(action)),
+          Expanded(child: Text(text, style: const TextStyle(color: PaceColors.ink, fontSize: 14, height: 1.3))),
+          TextButton(
+            onPressed: onTap,
+            child: Text(action, style: const TextStyle(color: PaceColors.mintDark, fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );

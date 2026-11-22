@@ -412,7 +412,8 @@ class _ScenePainter extends CustomPainter {
       final elev = math.sin(math.pi * p.clamp(0.0, 1.0));
       final top = 105.0;
       final low = horizon + 26;
-      final c = Offset(w * (0.76 + 0.1 * p.clamp(0.0, 1.0)), low - (low - top) * math.pow(elev, 0.75));
+      // Perto do horizonte o sol fica mais à direita, para não sumir atrás do botão.
+      final c = Offset(w * (0.8 + 0.08 * (1 - elev)), low - (low - top) * math.pow(elev, 0.75));
       final big = mo == SkyMoment.sunset || mo == SkyMoment.sunrise;
       final r = big ? 44.0 : 36.0;
       if (mo == SkyMoment.sunrise || mo == SkyMoment.sunset) {
@@ -534,16 +535,30 @@ class _ScenePainter extends CustomPainter {
         ).createShader(Rect.fromLTWH(0, nearY + 40, w, 260)),
     );
 
-    // Capim balançando no morro da frente.
+    // Tufos de capim balançando com o vento no morro da frente.
     final grass = Paint()
-      ..color = Color.lerp(l.hillNear, Colors.black, 0.18)!
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round;
-    for (double x = 6; x < w; x += 11) {
-      final base = Offset(x, _hillY(x, w, nearY, 16, 3.1) + 3);
-      final hgt = 7 + _r(x.toInt()) * 7;
-      final sway = math.sin(t * 1.6 + x * 0.045) * 0.22 + 0.08;
-      canvas.drawLine(base, base + Offset(math.sin(sway) * hgt, -math.cos(sway) * hgt), grass);
+      ..color = Color.lerp(l.hillNear, Colors.black, 0.12)!
+      ..style = PaintingStyle.fill;
+    var gi = 0;
+    for (double x = 4; x < w; x += 15 + _r(gi + 2000) * 22) {
+      gi++;
+      if (_r(gi + 2100) < 0.25) continue;
+      final base = Offset(x, _hillY(x, w, nearY, 16, 3.1) + 4);
+      final wind = math.sin(t * 1.3 + x * 0.03) * 0.5 + 0.35;
+      final blades = 3 + (_r(gi + 2200) * 3).floor();
+      for (var b = 0; b < blades; b++) {
+        final ang = (b - (blades - 1) / 2) * 0.32;
+        final hgt = 6 + _r(gi * 7 + b) * 8;
+        final lean = ang + wind * (0.25 + hgt / 50);
+        final tip = base + Offset(math.sin(lean) * hgt, -math.cos(lean) * hgt);
+        final ctrl = base + Offset(math.sin(lean * 0.4) * hgt * 0.6, -hgt * 0.65);
+        final blade = Path()
+          ..moveTo(base.dx - 1.3, base.dy)
+          ..quadraticBezierTo(ctrl.dx - 0.6, ctrl.dy, tip.dx, tip.dy)
+          ..quadraticBezierTo(ctrl.dx + 0.6, ctrl.dy, base.dx + 1.3, base.dy)
+          ..close();
+        canvas.drawPath(blade, grass);
+      }
     }
 
     // Vaga-lumes.
