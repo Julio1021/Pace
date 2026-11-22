@@ -33,8 +33,8 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
+    final cs = glassTheme.colorScheme;
+    final t = glassTheme.textTheme;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final end = today.add(const Duration(days: 1));
@@ -77,8 +77,12 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     final labelEvery = chartData.length <= 8 ? 1 : (chartData.length / 6).ceil();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Evolução')),
-      body: app.activities.isEmpty
+      body: Stack(
+        children: [
+          const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 560)),
+          SafeArea(
+            bottom: false,
+            child: app.activities.isEmpty
           ? const Center(
               child: EmptyState(
                 icon: Icons.insights,
@@ -88,8 +92,10 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
               ),
             )
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 130),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 130),
               children: [
+                const Appear(child: ScreenTitle('Evolução')),
+                const SizedBox(height: 14),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -155,7 +161,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                                 style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                           ),
                           Text('menos ', style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                          for (final c in [Pal.of(context).faint, Pal.of(context).mintMid, PaceColors.mint])
+                          for (final c in [const Pal(true).faint, const Pal(true).mintMid, const Pal(true).mint])
                             Container(
                               width: 10,
                               height: 10,
@@ -193,7 +199,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                   Text(
                     'Comparação com os ${_labels[_p]} anteriores (${Fmt.dayMonth(start.subtract(span))} a '
                     '${Fmt.dayMonth(start.subtract(const Duration(days: 1)))}).',
-                    style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    style: const TextStyle(fontSize: 12, color: PaceColors.muted),
                   ),
                 ],
                 const SectionTitle('Desde o início'),
@@ -206,6 +212,9 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -56,7 +56,11 @@ class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Cartão de vidro fosco (semitransparente sobre o fundo).
+/// Tema escuro usado dentro dos cartões de vidro fumê (textos claros).
+final ThemeData glassTheme = buildTheme(Brightness.dark);
+
+/// Cartão de "vidro fumê": grafite translúcido com brilho diagonal suave,
+/// filete de luz no topo e borda fina. O conteúdo usa o tema escuro.
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -75,27 +79,78 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    final content = Material(
-      color: blur ? p.cardGlass : p.card,
-      child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+    final r = BorderRadius.circular(radius);
+    final body = Theme(
+      data: glassTheme,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          splashColor: Colors.white.withValues(alpha: 0.06),
+          highlightColor: Colors.white.withValues(alpha: 0.04),
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+    final tinted = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: r,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xD6222934), Color(0xE6121720)],
+        ),
+      ),
+      child: DecoratedBox(
+        // Brilho diagonal do vidro.
+        decoration: BoxDecoration(
+          borderRadius: r,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: const Alignment(0.2, 0.4),
+            colors: [Colors.white.withValues(alpha: 0.10), Colors.white.withValues(alpha: 0.0)],
+          ),
+        ),
+        child: body,
+      ),
     );
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: p.shadow,
+        borderRadius: r,
+        boxShadow: const [
+          BoxShadow(color: Color(0x1F0F172A), blurRadius: 18, offset: Offset(0, 8)),
+          BoxShadow(color: Color(0x140F172A), blurRadius: 4, offset: Offset(0, 1)),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: r,
         child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: p.dark ? p.border : const Color(0xF2FFFFFF)),
-          ),
           position: DecorationPosition.foreground,
-          child: blur
-              ? BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14), child: content)
-              : content,
+          decoration: BoxDecoration(
+            borderRadius: r,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+          ),
+          child: Stack(
+            children: [
+              blur ? BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: tinted) : tinted,
+              // Filete de luz no topo (borda do vidro).
+              Positioned(
+                left: radius * 0.6,
+                right: radius * 0.6,
+                top: 0,
+                child: Container(
+                  height: 1,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [
+                      Colors.white.withValues(alpha: 0),
+                      Colors.white.withValues(alpha: 0.28),
+                      Colors.white.withValues(alpha: 0),
+                    ]),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -201,7 +256,7 @@ class MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
+    const p = Pal(true);
     return GlassCard(
       radius: 20,
       padding: const EdgeInsets.fromLTRB(12, 14, 10, 14),

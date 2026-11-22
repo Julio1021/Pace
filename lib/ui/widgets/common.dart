@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import 'pace_ui.dart';
 
 /// Cartão padrão com cantos arredondados e espaçamento interno.
 class PaceCard extends StatelessWidget {
@@ -13,11 +14,16 @@ class PaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = color;
+    if (c == null) {
+      // Padrão do app: vidro fumê.
+      return GlassCard(padding: padding, onTap: onTap, radius: 22, child: child);
+    }
     final p = Pal.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), boxShadow: p.shadow),
       child: Card(
-        color: color,
+        color: c,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,

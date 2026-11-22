@@ -360,7 +360,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Meta', style: t.titleSmall),
+                      Text('Meta', style: glassTheme.textTheme.titleSmall),
                       const SizedBox(height: 8),
                       SegmentedButton<GoalType>(
                         showSelectedIcon: false,

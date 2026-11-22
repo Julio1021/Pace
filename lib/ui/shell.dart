@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -119,7 +121,8 @@ class PaceNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
+    const p = Pal(true);
+    final bg = Pal.of(context).bg;
     Widget item(int i, IconData icon, IconData sel, String label) {
       final on = index == i;
       final c = on ? p.mintText : p.muted;
@@ -164,28 +167,31 @@ class PaceNavBar extends StatelessWidget {
             clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
             children: [
-              Container(
-                height: 68,
-                decoration: BoxDecoration(
-                  color: p.card,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: p.dark ? PaceColors.lineDark : const Color(0xFFE9EDF2)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: p.dark ? Colors.black.withValues(alpha: 0.4) : const Color(0x1A0F172A),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    height: 68,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xE0222934), Color(0xF0121720)],
+                      ),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    item(0, Icons.home_outlined, Icons.home_rounded, 'Início'),
-                    item(1, Icons.format_list_bulleted_rounded, Icons.view_list_rounded, 'Histórico'),
-                    const Expanded(child: SizedBox()),
-                    item(3, Icons.insights_outlined, Icons.insights_rounded, 'Evolução'),
-                    item(4, Icons.person_outline_rounded, Icons.person_rounded, 'Perfil'),
-                  ],
+                    child: Row(
+                      children: [
+                        item(0, Icons.home_outlined, Icons.home_rounded, 'Início'),
+                        item(1, Icons.format_list_bulleted_rounded, Icons.view_list_rounded, 'Histórico'),
+                        const Expanded(child: SizedBox()),
+                        item(3, Icons.insights_outlined, Icons.insights_rounded, 'Evolução'),
+                        item(4, Icons.person_outline_rounded, Icons.person_rounded, 'Perfil'),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               Positioned(
@@ -200,14 +206,14 @@ class PaceNavBar extends StatelessWidget {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: p.mint,
+                        color: PaceColors.mint,
                         shape: BoxShape.circle,
-                        border: Border.all(color: p.bg, width: 5),
-                        boxShadow: [BoxShadow(color: p.mint.withValues(alpha: 0.45), blurRadius: 20, offset: const Offset(0, 8))],
+                        border: Border.all(color: bg, width: 5),
+                        boxShadow: [BoxShadow(color: PaceColors.mint.withValues(alpha: 0.45), blurRadius: 20, offset: const Offset(0, 8))],
                       ),
                       child: Icon(
                         index == 2 ? Icons.directions_run_rounded : Icons.play_arrow_rounded,
-                        color: p.dark ? PaceColors.bgDark : Colors.white,
+                        color: Colors.white,
                         size: 30,
                       ),
                     ),

@@ -10,6 +10,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/exporters.dart';
 import '../../state/app_state.dart';
+import '../widgets/pace_ui.dart';
 import '../widgets/common.dart';
 import 'import_screen.dart';
 import 'profile_edit_screen.dart';
@@ -71,8 +72,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final app = context.watch<AppState>();
     final p = app.profile;
     final life = app.lifetime;
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
+    final cs = glassTheme.colorScheme;
+    final t = glassTheme.textTheme;
     final first = app.firstRunDate;
     final details = <String>[
       if (p.age != null) '${p.age} anos',
@@ -82,10 +83,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 130),
+      body: Stack(
         children: [
+          const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 560)),
+          SafeArea(
+            bottom: false,
+            child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 130),
+        children: [
+          const Appear(child: ScreenTitle('Perfil')),
+          const SizedBox(height: 14),
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -134,8 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           if (p.weightKg == null) ...[
             const SizedBox(height: 8),
-            Text('Sem peso no perfil, as calorias são estimadas com 70 kg.',
-                style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            const Text('Sem peso no perfil, as calorias são estimadas com 70 kg.',
+                style: TextStyle(fontSize: 12, color: PaceColors.muted)),
           ],
           const SectionTitle('Seus números'),
           PaceCard(
@@ -202,6 +209,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'Calorias são estimativas e não substituem avaliação profissional.',
               style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
+          ),
+        ],
+      ),
           ),
         ],
       ),

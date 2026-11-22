@@ -14,6 +14,7 @@ import '../../data/exporters.dart';
 import '../../domain/calc.dart';
 import '../../domain/models.dart';
 import '../../state/app_state.dart';
+import '../widgets/pace_ui.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
 import '../widgets/guara.dart';
@@ -256,11 +257,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           const SizedBox(height: 12),
           PaceCard(
             child: StatGrid(columns: 3, spacing: 18, children: [
-              StatTile(label: 'Tempo', value: Fmt.duration(a.movingSec), color: Pal.of(context).violet),
-              StatTile(label: 'Pace médio', value: Fmt.pace(a.paceSecPerKm), unit: '/km', color: Pal.of(context).orange),
+              StatTile(label: 'Tempo', value: Fmt.duration(a.movingSec), color: const Pal(true).violet),
+              StatTile(label: 'Pace médio', value: Fmt.pace(a.paceSecPerKm), unit: '/km', color: const Pal(true).orange),
               StatTile(label: 'Velocidade', value: Fmt.speed(a.avgSpeed), unit: 'km/h'),
               StatTile(label: 'Melhor km', value: best == null ? '—' : Fmt.duration(best)),
-              StatTile(label: 'Calorias (estim.)', value: a.calories == null ? '—' : Fmt.integer(a.calories!), unit: 'kcal', color: Pal.of(context).pink),
+              StatTile(label: 'Calorias (estim.)', value: a.calories == null ? '—' : Fmt.integer(a.calories!), unit: 'kcal', color: const Pal(true).pink),
               StatTile(label: 'Elevação', value: '+${Fmt.integer(a.elevGain)}', unit: 'm'),
               if (a.elapsedSec > a.movingSec + 30) StatTile(label: 'Tempo total', value: Fmt.duration(a.elapsedSec)),
               if (a.avgHr != null) StatTile(label: 'FC média', value: '${a.avgHr}', unit: 'bpm'),
@@ -279,7 +280,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               padding: const EdgeInsets.fromLTRB(4, 16, 16, 8),
               child: DistanceLineChart(
                 data: [for (final p in paceData) (x: p.km, y: p.pace)],
-                color: Pal.of(context).orange,
+                color: const Pal(true).orange,
                 formatY: Fmt.pace,
                 invert: true,
               ),

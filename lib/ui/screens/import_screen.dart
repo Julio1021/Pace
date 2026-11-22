@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../data/import_service.dart';
 import '../../data/importers.dart';
 import '../../state/app_state.dart';
+import '../widgets/pace_ui.dart';
 import '../widgets/common.dart';
 
 /// Importação de histórico: vários .tcx/.gpx de uma vez ou um .zip com eles.
@@ -66,8 +67,8 @@ class _ImportScreenState extends State<ImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
+    final cs = glassTheme.colorScheme;
+    final t = glassTheme.textTheme;
     final r = _report;
     return Scaffold(
       appBar: AppBar(title: const Text('Importar histórico')),

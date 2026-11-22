@@ -205,7 +205,7 @@ class _GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
+    const p = Pal(true);
     final week = app.weekStats(now);
     final goal = app.profile.weeklyGoalKm;
     final km = week.distanceM / 1000;
@@ -299,7 +299,7 @@ class _TodayRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
+    const p = Pal(true);
     // Hoje, se correu hoje; senão, os números da última corrida.
     final today = stats.count > 0;
     final sec = today ? stats.movingSec.toDouble() : last.movingSec.toDouble();
@@ -349,7 +349,7 @@ class _LastRunCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
+    const p = Pal(true);
     final isToday = Periods.dayStart(a.start.toLocal()) == Periods.dayStart(DateTime.now());
     final when = isToday ? 'Hoje, ${Fmt.time(a.start)}' : '${Fmt.date(a.start)} · ${Fmt.time(a.start)}';
     return GlassCard(
@@ -387,7 +387,7 @@ class _LastRunCard extends StatelessWidget {
   }
 
   Widget _kv(BuildContext context, String v, String l) {
-    final p = Pal.of(context);
+    const p = Pal(true);
     return Text.rich(TextSpan(children: [
       TextSpan(text: v, style: numStyle(14, color: p.ink)),
       TextSpan(text: ' $l', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.muted)),
@@ -402,7 +402,7 @@ class _Last7 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
+    const p = Pal(true);
     final today = Periods.dayStart(now);
     final from = today.subtract(const Duration(days: 6));
     final to = DateTime(today.year, today.month, today.day + 1);

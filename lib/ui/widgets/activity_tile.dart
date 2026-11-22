@@ -1,3 +1,4 @@
+import 'pace_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/format.dart';
@@ -15,8 +16,8 @@ class ActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = activity;
-    final t = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
+    final t = glassTheme.textTheme;
+    final cs = glassTheme.colorScheme;
     return PaceCard(
       onTap: onTap,
       child: Row(
