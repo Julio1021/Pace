@@ -31,9 +31,16 @@ jobs:
       - name: Chave de assinatura (Secrets)
         env:
           KS: ${{ secrets.PACE_KEYSTORE_B64 }}
+          PW: ${{ secrets.PACE_KEYSTORE_PASSWORD }}
         run: |
+          if [ -z "$PW" ]; then
+            echo "::warning::Secret PACE_KEYSTORE_PASSWORD não configurado (ou vazio)."
+          else
+            echo "Senha encontrada (${#PW} caracteres)."
+          fi
           if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > "$RUNNER_TEMP/pace-release.jks"
+            echo "$KS" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/pace-release.jks"
+            ls -l "$RUNNER_TEMP/pace-release.jks"
             echo "PACE_KEYSTORE_PATH=$RUNNER_TEMP/pace-release.jks" >> "$GITHUB_ENV"
             echo "Chave encontrada."
           else
