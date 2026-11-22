@@ -233,7 +233,7 @@ class GpsFilter {
 /// fantasma em ruas com prédios ou árvores.
 class GpsSmoother {
   /// Quanto a posição pode mudar por segundo (m/s) — corrida rápida, com folga.
-  static const q = 3.5;
+  static const q = 3.0;
   double? _lat, _lon;
   double _var = -1;
   DateTime? _t;
