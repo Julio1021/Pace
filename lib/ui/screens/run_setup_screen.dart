@@ -719,8 +719,8 @@ Future<bool> showStartCountdown(BuildContext context) async {
     barrierDismissible: false,
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (_, _, _) => const _Countdown(),
-    transitionBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
+    pageBuilder: (ctx, a1, a2) => const _Countdown(),
+    transitionBuilder: (ctx, a, a2, child) => FadeTransition(opacity: a, child: child),
   );
   return r ?? false;
 }
