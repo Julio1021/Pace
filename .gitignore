@@ -5,8 +5,8 @@ build/
 .flutter-plugins-dependencies
 *.iml
 .idea/
-android/
-ios/
+/android/
+/ios/
 pubspec.lock
 test/prints/
 *.jks
