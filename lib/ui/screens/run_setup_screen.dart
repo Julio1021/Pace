@@ -363,9 +363,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 final caption = goal <= 0
                     ? 'Bora correr?'
                     : prog >= 1
-                        ? 'Meta da semana batida!'
+                        ? 'Meta da semana\nbatida!'
                         : '${Fmt.km(km * 1000, decimals: 1)} de '
-                            '${goal == goal.roundToDouble() ? goal.toInt() : Fmt.km(goal * 1000, decimals: 1)} km na semana';
+                            '${goal == goal.roundToDouble() ? goal.toInt() : Fmt.km(goal * 1000, decimals: 1)} km\nna semana';
                 return _StartButton(onTap: _starting ? null : () => _start(), progress: prog, caption: caption);
               }),
             ),
@@ -576,23 +576,21 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
       ),
       child: Stack(
         children: [
-          // Reflexo do vidro.
-          Positioned(
-            left: 18,
-            top: 10,
-            right: 30,
-            child: Container(
-              height: 46,
+          // Reflexo do vidro: um brilho suave no alto, à esquerda.
+          Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(60),
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0)],
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: const Alignment(-0.45, -0.6),
+                  radius: 0.75,
+                  colors: [Colors.white.withValues(alpha: 0.13), Colors.white.withValues(alpha: 0)],
                 ),
               ),
             ),
           ),
+          // Fio de luz na borda de cima.
+          Positioned.fill(child: CustomPaint(painter: _RimPainter())),
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -600,9 +598,19 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
                 const Icon(Icons.play_arrow_rounded, size: 44, color: PaceColors.mintBright),
                 Text('INICIAR', style: numStyle(16, color: Colors.white).copyWith(letterSpacing: 2)),
                 const SizedBox(height: 3),
-                Text(
-                  widget.caption,
-                  style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.72), fontWeight: FontWeight.w600),
+                SizedBox(
+                  width: 96,
+                  child: Text(
+                    widget.caption,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.25,
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -612,7 +620,7 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
     );
     return Semantics(
       button: true,
-      label: 'Iniciar corrida. ${widget.caption}',
+      label: 'Iniciar corrida. ${widget.caption.replaceAll('\n', ' ')}',
       child: GestureDetector(
         onTapDown: (_) => setState(() => _down = true),
         onTapCancel: () => setState(() => _down = false),
@@ -658,6 +666,31 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
       ),
     );
   }
+}
+
+class _RimPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(1.5);
+    canvas.drawArc(
+      rect,
+      math.pi * 1.1,
+      math.pi * 0.8,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..strokeCap = StrokeCap.round
+        ..shader = SweepGradient(
+          startAngle: math.pi * 1.1,
+          endAngle: math.pi * 1.9,
+          colors: [Colors.white.withValues(alpha: 0), Colors.white.withValues(alpha: 0.45), Colors.white.withValues(alpha: 0)],
+        ).createShader(rect),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RimPainter o) => false;
 }
 
 /// Anel da meta semanal em volta do botão.
