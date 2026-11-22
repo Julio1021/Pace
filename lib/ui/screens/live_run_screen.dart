@@ -10,6 +10,7 @@ import '../../services/recorder.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/guara.dart';
+import '../../services/run_notification.dart';
 import '../widgets/route_widgets.dart';
 import 'activity_detail_screen.dart';
 
@@ -28,6 +29,18 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
   double _holdProgress = 0;
   final _map = MapController();
   int _lastPointCount = 0;
+  bool? _notifOk;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkNotif();
+  }
+
+  Future<void> _checkNotif() async {
+    final ok = await RunNotification.allowed();
+    if (mounted) setState(() => _notifOk = ok);
+  }
 
   Future<void> _finish() async {
     if (_finishing) return;
@@ -136,6 +149,30 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                   ],
                 ),
               ),
+              if (_notifOk == false)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Material(
+                    color: const Color(0xFF2A2F3A),
+                    borderRadius: BorderRadius.circular(14),
+                    child: ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.notifications_off_outlined, color: PaceColors.orange),
+                      title: const Text('Notificações desativadas',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      subtitle: const Text('Ative para ver a corrida na tela de bloqueio.',
+                          style: TextStyle(color: Colors.white70)),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          await RunNotification.openSettings();
+                          await Future<void>.delayed(const Duration(seconds: 1));
+                          _checkNotif();
+                        },
+                        child: const Text('Ativar'),
+                      ),
+                    ),
+                  ),
+                ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 transitionBuilder: (c, anim) => FadeTransition(

@@ -16,7 +16,10 @@ object RunNotification {
     const val CHANNEL = "pace/run_notification"
     const val ACTION_TOGGLE = "br.com.julio.pace.action.TOGGLE"
     private const val ID = 7301
-    private const val CHANNEL_ID = "pace_run_live"
+    // Canal novo com importância padrão: canais "silenciosos" não aparecem na
+    // tela de bloqueio na maioria dos celulares. Som e vibração seguem desligados.
+    private const val CHANNEL_ID = "pace_run_live_v2"
+    private const val OLD_CHANNEL_ID = "pace_run_live"
 
     var channel: MethodChannel? = null
 
@@ -24,8 +27,9 @@ object RunNotification {
 
     private fun ensureChannel(ctx: Context) {
         val nm = manager(ctx)
+        if (nm.getNotificationChannel(OLD_CHANNEL_ID) != null) nm.deleteNotificationChannel(OLD_CHANNEL_ID)
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        val c = NotificationChannel(CHANNEL_ID, "Corrida ao vivo", NotificationManager.IMPORTANCE_LOW).apply {
+        val c = NotificationChannel(CHANNEL_ID, "Corrida ao vivo", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "Tempo, distância e pace durante a corrida, também na tela de bloqueio"
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
@@ -92,6 +96,28 @@ object RunNotification {
                 }
             }
             manager(ctx).notify(ID, b.build())
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** Se as notificações do app e do canal estão liberadas. */
+    fun status(ctx: Context): Map<String, Any> {
+        val nm = manager(ctx)
+        ensureChannel(ctx)
+        val ch = nm.getNotificationChannel(CHANNEL_ID)
+        return mapOf(
+            "enabled" to nm.areNotificationsEnabled(),
+            "channelOn" to (ch == null || ch.importance != NotificationManager.IMPORTANCE_NONE),
+            "lockScreenPublic" to (ch == null || ch.lockscreenVisibility != Notification.VISIBILITY_SECRET),
+        )
+    }
+
+    fun openSettings(ctx: Context) {
+        try {
+            val i = Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ctx.startActivity(i)
         } catch (_: Throwable) {
         }
     }

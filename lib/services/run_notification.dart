@@ -40,6 +40,23 @@ class RunNotification {
     }
   }
 
+  /// true/false se as notificações estão liberadas; null se não deu para saber.
+  static Future<bool?> allowed() async {
+    try {
+      final m = await _ch.invokeMapMethod<String, dynamic>('status');
+      if (m == null) return null;
+      return m['enabled'] == true && m['channelOn'] == true && m['lockScreenPublic'] == true;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> openSettings() async {
+    try {
+      await _ch.invokeMethod('settings');
+    } catch (_) {}
+  }
+
   static Future<void> cancel() async {
     try {
       await _ch.invokeMethod('cancel');

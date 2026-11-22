@@ -16,6 +16,11 @@ class MainActivity : FlutterActivity() {
                     RunNotification.show(applicationContext, (call.arguments as? Map<String, Any?>) ?: emptyMap())
                     result.success(null)
                 }
+                "status" -> result.success(RunNotification.status(applicationContext))
+                "settings" -> {
+                    RunNotification.openSettings(this)
+                    result.success(null)
+                }
                 "cancel" -> {
                     RunNotification.cancel(applicationContext)
                     result.success(null)
