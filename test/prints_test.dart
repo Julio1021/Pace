@@ -18,6 +18,7 @@ import 'package:pace/data/importers.dart';
 import 'package:pace/domain/models.dart';
 import 'package:pace/services/recorder.dart';
 import 'package:pace/state/app_state.dart';
+import 'package:pace/ui/intro_overlay.dart';
 import 'package:pace/ui/screens/activity_detail_screen.dart';
 import 'package:pace/ui/screens/import_screen.dart';
 import 'package:pace/ui/screens/live_run_screen.dart';
@@ -245,6 +246,13 @@ void main() {
     final env = await _makeEnv(tester, withData: false);
     await tester.pumpWidget(_wrap(env, const HomeShell()));
     await _shot(tester, '12-inicio-vazio');
+  }, skip: !_enabled);
+
+  testWidgets('13 abertura', (tester) async {
+    final env = await _makeEnv(tester);
+    await tester.pumpWidget(_wrap(env, IntroOverlay(onDone: () {})));
+    await _shot(tester, '13-abertura');
+    await tester.pump(const Duration(seconds: 3));
   }, skip: !_enabled);
 
   testWidgets('11 importar', (tester) async {

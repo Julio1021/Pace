@@ -201,6 +201,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+          const SectionTitle('Aparência'),
+          PaceCard(
+            padding: EdgeInsets.zero,
+            child: SwitchListTile(
+              secondary: const Icon(Icons.auto_awesome_outlined),
+              title: const Text('Animação de abertura'),
+              subtitle: const Text('O Guará dá um recado na primeira abertura do dia'),
+              value: app.introEnabled,
+              onChanged: app.setIntroEnabled,
+            ),
+          ),
           const SectionTitle('Sobre'),
           PaceCard(
             child: Text(

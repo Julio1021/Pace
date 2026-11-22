@@ -12,6 +12,10 @@ class AppState extends ChangeNotifier {
   bool ready = false;
   String? error;
 
+  /// Animação de abertura com o Guará (uma vez por dia).
+  bool introEnabled = true;
+  bool showIntroNow = false;
+
   PaceDatabase get db => _db!;
 
   Future<void> init({PaceDatabase? database}) async {
@@ -19,11 +23,31 @@ class AppState extends ChangeNotifier {
       _db = database ?? await PaceDatabase.open();
       profile = await db.getProfile();
       activities = await db.listActivities();
+      introEnabled = (await db.getKv('intro_enabled')) != '0';
+      final last = await db.getKv('intro_last_day');
+      final open = await db.listActivities(status: ActivityStatus.inProgress);
+      final today = _dayKey(DateTime.now());
+      showIntroNow = introEnabled && profile.isComplete && open.isEmpty && last != today;
     } catch (e) {
       error = 'Não foi possível abrir o banco de dados: $e';
     }
     ready = true;
     notifyListeners();
+  }
+
+  static String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+  /// Marca a abertura de hoje como vista.
+  Future<void> introShown() async {
+    showIntroNow = false;
+    notifyListeners();
+    await db.setKv('intro_last_day', _dayKey(DateTime.now()));
+  }
+
+  Future<void> setIntroEnabled(bool v) async {
+    introEnabled = v;
+    notifyListeners();
+    await db.setKv('intro_enabled', v ? '1' : '0');
   }
 
   Future<void> reload() async {

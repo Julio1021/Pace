@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'core/theme.dart';
 import 'state/app_state.dart';
+import 'ui/intro_overlay.dart';
 import 'ui/screens/profile_edit_screen.dart';
 import 'ui/shell.dart';
 
@@ -42,7 +43,12 @@ class RootGate extends StatelessWidget {
       return Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(app.error!))));
     }
     if (!app.profile.isComplete) return const ProfileEditScreen(onboarding: true);
-    return const HomeShell();
+    return Stack(
+      children: [
+        const HomeShell(),
+        if (app.showIntroNow) IntroOverlay(onDone: app.introShown),
+      ],
+    );
   }
 }
 
