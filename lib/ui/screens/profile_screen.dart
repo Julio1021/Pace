@@ -219,7 +219,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.record_voice_over_outlined),
                   title: const Text('Voz das falas'),
-                  subtitle: Text(app.voiceName.isEmpty ? 'Feminina (automática)' : 'Escolhida por você'),
+                  subtitle: Text(app.voiceName.isEmpty
+                      ? 'Francisca (natural)'
+                      : app.voiceName == 'auto'
+                          ? 'Feminina do celular'
+                          : 'Voz do celular escolhida'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => showModalBottomSheet<void>(
                     context: context,

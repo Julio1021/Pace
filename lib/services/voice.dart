@@ -28,8 +28,11 @@ class PaceVoice {
 
 /// Configura a voz das falas: a escolhida pelo usuário ou, no automático, uma feminina em pt-BR.
 class VoiceService {
-  /// Valor salvo que significa "escolher sozinho uma voz feminina".
-  static const auto = '';
+  /// Valor salvo para a voz natural gravada (Francisca), padrão.
+  static const natural = '';
+
+  /// Valor salvo para "voz feminina do celular, escolhida automaticamente".
+  static const auto = 'auto';
 
   static Future<List<PaceVoice>> portugueseVoices(FlutterTts tts) async {
     try {
@@ -67,7 +70,7 @@ class VoiceService {
     final voices = await portugueseVoices(tts);
     if (voices.isEmpty) return null;
     PaceVoice? pick;
-    if (saved != auto) {
+    if (saved != auto && saved != natural) {
       for (final v in voices) {
         if (v.name == saved) pick = v;
       }
@@ -75,9 +78,7 @@ class VoiceService {
     pick ??= voices.firstWhere((v) => v.likelyFemale, orElse: () => voices.first);
     try {
       await tts.setVoice(pick.asMap);
-      // Um tom levemente mais agudo reforça a voz feminina quando o aparelho
-      // não tem nenhuma identificada como tal.
-      await tts.setPitch(pick.likelyFemale || saved != auto ? 1.0 : 1.15);
+      await tts.setPitch(1.0);
     } catch (_) {}
     return pick.name;
   }

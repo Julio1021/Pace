@@ -2,12 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 
+import 'speech.dart';
 import 'voice.dart';
 import 'package:geolocator/geolocator.dart';
 
-import '../core/format.dart';
 import '../data/database.dart';
 import '../domain/calc.dart';
 import '../domain/coach.dart';
@@ -96,7 +95,7 @@ class Recorder extends ChangeNotifier {
   DateTime _lastFlush = DateTime.now();
   final _autoPause = AutoPause();
   final _paceWindow = PaceWindow();
-  FlutterTts? _tts;
+  final _speaker = Speaker();
   bool _busy = false;
 
   bool get isActive => state == RecState.running || state == RecState.paused;
@@ -144,7 +143,7 @@ class Recorder extends ChangeNotifier {
     await _initTts();
     _listen();
     final hi = _coach.onStart();
-    _say(hi == null ? 'Corrida iniciada.' : 'Corrida iniciada. $hi');
+    _say(['Corrida iniciada.', hi]);
     _showCoach(hi);
     notifyListeners();
   }
@@ -182,7 +181,7 @@ class Recorder extends ChangeNotifier {
     _clock = DateTime.now();
     await _initTts();
     _listen();
-    _say('Corrida retomada.');
+    _say(['Corrida retomada.']);
     notifyListeners();
   }
 
@@ -192,7 +191,7 @@ class Recorder extends ChangeNotifier {
     state = RecState.paused;
     _paceWindow.clear();
     HapticFeedback.mediumImpact();
-    _say('Corrida pausada.');
+    _say(['Corrida pausada.']);
     notifyListeners();
   }
 
@@ -205,7 +204,7 @@ class Recorder extends ChangeNotifier {
     autoPaused = false;
     HapticFeedback.mediumImpact();
     final msg = _coach.onResume(moving);
-    _say(msg == null ? 'Retomando.' : 'Retomando. $msg');
+    _say(['Retomando.', msg]);
     _showCoach(msg);
     notifyListeners();
   }
@@ -215,7 +214,7 @@ class Recorder extends ChangeNotifier {
     _closeLap(manual: true);
     HapticFeedback.heavyImpact();
     final l = laps.last;
-    _say('Volta ${l.index}. ${_spokenDuration(l.sec)}.');
+    _say(['Volta ${l.index}.', ...Speech.duration(l.sec)]);
     notifyListeners();
   }
 
@@ -231,7 +230,7 @@ class Recorder extends ChangeNotifier {
       await finalizeActivity(_db(), id, weightKg: _weightKg(), extraLaps: laps, endTime: DateTime.now().toUtc());
       state = RecState.finished;
       final bye = _coach.onFinish(moving);
-      _say('Corrida encerrada. ${Fmt.km(distance).replaceAll(',', ' vírgula ')} quilômetros.${bye == null ? '' : ' $bye'}');
+      _say(['Corrida encerrada.', ...Speech.distance(distance), bye]);
       notifyListeners();
       return id;
     } finally {
@@ -357,11 +356,11 @@ class Recorder extends ChangeNotifier {
           _advanceClock(now);
           autoPaused = true;
           _paceWindow.clear();
-          _say('Pausa automática.');
+          _say(['Pausa automática.']);
         } else {
           _clock = now;
           autoPaused = false;
-          _say('Retomando.');
+          _say(['Retomando.']);
         }
       }
     }
@@ -409,7 +408,7 @@ class Recorder extends ChangeNotifier {
       if (gp != null && gp < 1) {
         final msg = _coach.onProgress(gp, moving);
         if (msg != null) {
-          _say(msg);
+          _say([msg]);
           _showCoach(msg);
         }
       }
@@ -441,11 +440,16 @@ class Recorder extends ChangeNotifier {
       final avgPrev = prev.isEmpty ? null : prev.fold<double>(0, (t, x) => t + x.sec) / prev.length;
       final msg = _coach.onKm(km, moving, splitSec: sec, avgPrevSec: avgPrev);
       if (config.voice) {
-        _say('$km ${km == 1 ? 'quilômetro' : 'quilômetros'}. '
-            'Tempo ${_spokenDuration(moving)}. '
-            'Último quilômetro em ${_spokenDuration(sec)}. '
-            'Pace médio ${_spokenDuration(avgPace ?? 0)}.'
-            '${msg == null ? '' : ' $msg'}');
+        _say([
+          Speech.kmCount(km),
+          'Tempo',
+          ...Speech.duration(moving),
+          'Último quilômetro em',
+          ...Speech.duration(sec),
+          'Pace médio',
+          ...Speech.duration(avgPace ?? 0),
+          msg,
+        ]);
       }
       _showCoach(msg);
     }
@@ -484,7 +488,7 @@ class Recorder extends ChangeNotifier {
       _goalAnnounced = true;
       HapticFeedback.heavyImpact();
       final msg = _coach.onGoalReached(moving);
-      _say(msg == null ? 'Meta atingida!' : 'Meta atingida! $msg', force: true);
+      _say(['Meta atingida!', msg], force: true);
       _showCoach(msg ?? 'Meta atingida!');
     }
   }
@@ -528,36 +532,13 @@ class Recorder extends ChangeNotifier {
 
   // ---------------- Voz ----------------
 
-  Future<void> _initTts() async {
-    if (_tts != null) return;
-    try {
-      final tts = FlutterTts();
-      await VoiceService.apply(tts, _voiceName());
-      _tts = tts;
-    } catch (_) {
-      _tts = null;
-    }
-  }
+  Future<void> _initTts() => _speaker.init(_voiceName());
 
-  void _say(String text, {bool force = false}) {
+  void _say(List<String?> parts, {bool force = false}) {
     if (!config.voice && !force) return;
-    final tts = _tts;
-    if (tts == null) return;
-    tts.speak(text).catchError((Object _) => null);
+    _speaker.say(parts);
   }
 
-  static String _spokenDuration(double seconds) {
-    final s = seconds.round();
-    final h = s ~/ 3600;
-    final m = (s % 3600) ~/ 60;
-    final sec = s % 60;
-    final parts = <String>[];
-    if (h > 0) parts.add('$h ${h == 1 ? 'hora' : 'horas'}');
-    if (m > 0) parts.add('$m ${m == 1 ? 'minuto' : 'minutos'}');
-    if (sec > 0 || parts.isEmpty) parts.add('$sec ${sec == 1 ? 'segundo' : 'segundos'}');
-    if (parts.length == 1) return parts.first;
-    return '${parts.sublist(0, parts.length - 1).join(', ')} e ${parts.last}';
-  }
 
   void _reset() {
     _sub?.cancel();

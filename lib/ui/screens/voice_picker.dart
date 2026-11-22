@@ -3,6 +3,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../services/speech.dart';
 import '../../services/voice.dart';
 import '../../state/app_state.dart';
 
@@ -17,6 +18,7 @@ class VoicePickerSheet extends StatefulWidget {
 class _VoicePickerSheetState extends State<VoicePickerSheet> {
   static const _sample = 'Bora! Mais um quilômetro. Você está mandando bem.';
   final _tts = FlutterTts();
+  final _natural = Speaker();
   List<PaceVoice>? _voices;
 
   @override
@@ -33,6 +35,12 @@ class _VoicePickerSheetState extends State<VoicePickerSheet> {
 
   Future<void> _play(String name) async {
     await _tts.stop();
+    await _natural.stop();
+    if (name == VoiceService.natural) {
+      await _natural.init(VoiceService.natural);
+      _natural.say(['Corrida iniciada.', 'Bora! Mais um quilômetro. Você está mandando bem.']);
+      return;
+    }
     await VoiceService.apply(_tts, name);
     await _tts.speak(_sample);
   }
@@ -40,6 +48,7 @@ class _VoicePickerSheetState extends State<VoicePickerSheet> {
   @override
   void dispose() {
     _tts.stop();
+    _natural.stop();
     super.dispose();
   }
 
@@ -74,8 +83,13 @@ class _VoicePickerSheetState extends State<VoicePickerSheet> {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('Voz das falas', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             ),
-            tile(VoiceService.auto, 'Feminina (automática)', 'O PACE escolhe uma voz feminina do aparelho'),
+            tile(VoiceService.natural, 'Francisca (natural)', 'Voz gravada, funciona sem internet · padrão'),
             const Divider(height: 1),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 14, 20, 4),
+              child: Text('Vozes do celular', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+            tile(VoiceService.auto, 'Feminina do celular (automática)', 'O PACE escolhe uma voz feminina do aparelho'),
             if (voices == null)
               const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
             else if (voices.isEmpty)
@@ -97,8 +111,8 @@ class _VoicePickerSheetState extends State<VoicePickerSheet> {
                 ),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
-              child: Text('Toque no ▶ para ouvir. Os nomes vêm do motor de voz do celular; '
-                  'se uma "feminina" soar masculina, escolha outra ouvindo.'),
+              child: Text('Toque no ▶ para ouvir. As vozes do celular vêm do motor de voz do aparelho; '
+                  'a Francisca vem gravada no app.'),
             ),
           ],
         ),
