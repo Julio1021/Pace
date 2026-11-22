@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:provider/provider.dart';
@@ -13,6 +15,7 @@ import '../../domain/models.dart';
 import '../../services/recorder.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../widgets/guara.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/sky_scene.dart';
 import 'live_run_screen.dart';
@@ -202,6 +205,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
       );
       if (!go) return;
     }
+    if (!mounted) return;
+    if (!await showStartCountdown(context)) return;
+    if (!mounted) return;
     setState(() => _starting = true);
     try {
       try {
@@ -288,7 +294,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     final base = Theme.of(context);
     final mq = MediaQuery.of(context);
     // Os morros ficam logo abaixo do botão Iniciar.
-    final horizon = mq.padding.top + 330;
+    final horizon = mq.padding.top + 290;
     return Scaffold(
       backgroundColor: sky.look.ground,
       body: Stack(
@@ -346,14 +352,25 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               ],
             ),
           ),
-          const SizedBox(height: 34),
+          const SizedBox(height: 22),
           Appear(
             delayMs: 120,
             child: Center(
-              child: _StartButton(onTap: _starting ? null : () => _start()),
+              child: Builder(builder: (context) {
+                final goal = app.profile.weeklyGoalKm;
+                final km = app.weekStats(now).distanceM / 1000;
+                final prog = goal > 0 ? km / goal : 0.0;
+                final caption = goal <= 0
+                    ? 'Bora correr?'
+                    : prog >= 1
+                        ? 'Meta da semana batida!'
+                        : '${Fmt.km(km * 1000, decimals: 1)} de '
+                            '${goal == goal.roundToDouble() ? goal.toInt() : Fmt.km(goal * 1000, decimals: 1)} km na semana';
+                return _StartButton(onTap: _starting ? null : () => _start(), progress: prog, caption: caption);
+              }),
             ),
           ),
-          const SizedBox(height: 34),
+          const SizedBox(height: 18),
           if (!_hasPermission)
             _Banner(
               icon: Icons.location_off,
@@ -504,14 +521,23 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
 /// Botão grande de iniciar, com pulso suave.
 class _StartButton extends StatefulWidget {
   final VoidCallback? onTap;
-  const _StartButton({required this.onTap});
+
+  /// Progresso da meta da semana (0 a 1) e o texto embaixo de "INICIAR".
+  final double progress;
+  final String caption;
+  const _StartButton({required this.onTap, required this.progress, required this.caption});
 
   @override
   State<_StartButton> createState() => _StartButtonState();
 }
 
 class _StartButtonState extends State<_StartButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  bool _down = false;
+
+  static const orb = 136.0;
+  static const ring = 152.0;
+  static const box = 176.0;
 
   @override
   void didChangeDependencies() {
@@ -531,48 +557,243 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
 
   @override
   Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    return Semantics(
-      button: true,
-      label: 'Iniciar corrida',
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (context, child) {
-            final t = _c.value;
-            return SizedBox(
-              width: 230,
-              height: 230,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 176 + 54 * t,
-                    height: 176 + 54 * t,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.mint.withValues(alpha: 0.35 * (1 - t))),
-                  ),
-                  child!,
-                ],
+    final done = widget.progress >= 1;
+    final orbChild = Container(
+      width: orb,
+      height: orb,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF02B3340), Color(0xF5121720)],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(color: PaceColors.mintBright.withValues(alpha: 0.28), blurRadius: 26, offset: const Offset(0, 8)),
+          const BoxShadow(color: Color(0x330F172A), blurRadius: 10, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Reflexo do vidro.
+          Positioned(
+            left: 18,
+            top: 10,
+            right: 30,
+            child: Container(
+              height: 46,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(60),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.white.withValues(alpha: 0.14), Colors.white.withValues(alpha: 0)],
+                ),
               ),
-            );
-          },
-          child: Container(
-            width: 176,
-            height: 176,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: p.mint,
-              boxShadow: [BoxShadow(color: p.mint.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 10))],
             ),
+          ),
+          Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.play_arrow_rounded, size: 54, color: p.dark ? PaceColors.bgDark : Colors.white),
-                Text('INICIAR',
-                    style: numStyle(20, color: p.dark ? PaceColors.bgDark : Colors.white).copyWith(letterSpacing: 1)),
+                const Icon(Icons.play_arrow_rounded, size: 44, color: PaceColors.mintBright),
+                Text('INICIAR', style: numStyle(16, color: Colors.white).copyWith(letterSpacing: 2)),
+                const SizedBox(height: 3),
+                Text(
+                  widget.caption,
+                  style: TextStyle(fontSize: 10.5, color: Colors.white.withValues(alpha: 0.72), fontWeight: FontWeight.w600),
+                ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+    return Semantics(
+      button: true,
+      label: 'Iniciar corrida. ${widget.caption}',
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _down = true),
+        onTapCancel: () => setState(() => _down = false),
+        onTapUp: (_) => setState(() => _down = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _down ? 0.94 : 1,
+          duration: const Duration(milliseconds: 120),
+          child: AnimatedBuilder(
+            animation: _c,
+            builder: (context, child) {
+              final t = _c.value;
+              return SizedBox(
+                width: box,
+                height: box,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Onda suave saindo do anel.
+                    Container(
+                      width: ring + 24 * t,
+                      height: ring + 24 * t,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: PaceColors.mintBright.withValues(alpha: 0.45 * (1 - t)),
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    CustomPaint(
+                      size: const Size(ring, ring),
+                      painter: _GoalRingPainter(widget.progress.clamp(0.0, 1.0), done ? 0.6 + 0.4 * (1 - t) : 0),
+                    ),
+                    child!,
+                  ],
+                ),
+              );
+            },
+            child: orbChild,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Anel da meta semanal em volta do botão.
+class _GoalRingPainter extends CustomPainter {
+  final double progress;
+  final double glow;
+  _GoalRingPainter(this.progress, this.glow);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2 - 4;
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6
+        ..color = Colors.white.withValues(alpha: 0.32),
+    );
+    if (progress <= 0) return;
+    final rect = Rect.fromCircle(center: c, radius: r);
+    if (glow > 0) {
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 14
+          ..color = PaceColors.mintBright.withValues(alpha: 0.25 * glow)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+    }
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      2 * math.pi * progress,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6
+        ..strokeCap = StrokeCap.round
+        ..shader = const SweepGradient(
+          startAngle: -math.pi / 2,
+          endAngle: 3 * math.pi / 2,
+          colors: [Color(0xFF14B887), PaceColors.mintBright, Color(0xFF14B887)],
+        ).createShader(rect),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GoalRingPainter o) => o.progress != progress || o.glow != glow;
+}
+
+/// Contagem 3-2-1 com o Guará correndo; um toque cancela. Devolve true se completou.
+Future<bool> showStartCountdown(BuildContext context) async {
+  final r = await showGeneralDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (_, _, _) => const _Countdown(),
+    transitionBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
+  );
+  return r ?? false;
+}
+
+class _Countdown extends StatefulWidget {
+  const _Countdown();
+
+  @override
+  State<_Countdown> createState() => _CountdownState();
+}
+
+class _CountdownState extends State<_Countdown> {
+  int _n = 3;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    HapticFeedback.mediumImpact();
+    _t = Timer.periodic(const Duration(milliseconds: 850), (_) {
+      if (!mounted) return;
+      if (_n > 1) {
+        setState(() => _n--);
+        HapticFeedback.mediumImpact();
+      } else if (_n == 1) {
+        setState(() => _n = 0);
+        HapticFeedback.heavyImpact();
+      } else {
+        _t?.cancel();
+        Navigator.of(context).pop(true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = motionOn(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        _t?.cancel();
+        Navigator.of(context).pop(false);
+      },
+      child: Material(
+        color: const Color(0xD90B1220),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const Spacer(flex: 3),
+              AnimatedSwitcher(
+                duration: Duration(milliseconds: motion ? 320 : 0),
+                transitionBuilder: (c, a) => ScaleTransition(
+                  scale: Tween(begin: 1.6, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOutBack)),
+                  child: FadeTransition(opacity: a, child: c),
+                ),
+                child: Text(
+                  _n == 0 ? 'Bora!' : '$_n',
+                  key: ValueKey(_n),
+                  style: numStyle(_n == 0 ? 64 : 120, color: _n == 0 ? PaceColors.mintBright : Colors.white),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Guara(pose: GuaraPose.run, size: 120),
+              const Spacer(flex: 2),
+              Text('Toque para cancelar', style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 14)),
+              const SizedBox(height: 36),
+            ],
           ),
         ),
       ),
