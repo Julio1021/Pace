@@ -400,7 +400,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               onPressed: _starting ? null : () => _start(),
               style: FilledButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-                textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                textStyle: t.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w800),
               ),
               icon: const Icon(Icons.play_arrow, size: 30),
               label: const Text('Iniciar corrida'),

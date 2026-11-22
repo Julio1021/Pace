@@ -108,6 +108,7 @@ class StatGrid extends StatelessWidget {
       final row = <Widget>[];
       for (var j = 0; j < columns; j++) {
         final k = i + j;
+        if (j > 0) row.add(const SizedBox(width: 10));
         row.add(Expanded(child: k < children.length ? children[k] : const SizedBox()));
       }
       if (rows.isNotEmpty) rows.add(SizedBox(height: spacing));

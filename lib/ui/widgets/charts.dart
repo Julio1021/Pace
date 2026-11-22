@@ -17,7 +17,9 @@ class KmBarChart extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final muted = cs.onSurfaceVariant;
     final maxKm = data.fold<double>(0, (m, e) => math.max(m, e.km));
-    final top = maxKm <= 0 ? 5.0 : _niceCeil(maxKm * 1.15);
+    // Escala com 4 divisões "redondas" (ex.: 0, 5, 10, 15, 20).
+    final step = maxKm <= 0 ? 1.25 : _niceCeil(maxKm * 1.1 / 4);
+    final top = step * 4;
     final barW = data.length > 20 ? 6.0 : (data.length > 10 ? 10.0 : 18.0);
     return SizedBox(
       height: height,

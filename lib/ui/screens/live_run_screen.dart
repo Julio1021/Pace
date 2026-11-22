@@ -210,6 +210,7 @@ class _Numbers extends StatelessWidget {
                 child: Text(Fmt.km(rec.distance),
                     style: TextStyle(fontSize: big, fontWeight: FontWeight.w900, color: cs.primary, height: 1, fontFeatures: tab)),
               ),
+              const SizedBox(height: 10),
               Text('Quilômetros', style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),
