@@ -15,7 +15,11 @@ async def main(out):
     for v in vozes:
         nome = v["ShortName"].replace("pt-BR-", "").replace("Neural", "").lower()
         await edge_tts.Communicate(TEXTO, v["ShortName"]).save(f"{out}/{nome}-1-normal.mp3")
-        await edge_tts.Communicate(TEXTO, v["ShortName"], rate="+12%", pitch="+8Hz").save(
-            f"{out}/{nome}-2-animada.mp3")
+        for kw in ({"rate": "+12%", "pitch": "+8Hz"}, {"rate": "+12%"}):
+            try:
+                await edge_tts.Communicate(TEXTO, v["ShortName"], **kw).save(f"{out}/{nome}-2-animada.mp3")
+                break
+            except Exception as e:
+                print(v["ShortName"], kw, e)
 
 asyncio.run(main(sys.argv[1]))
