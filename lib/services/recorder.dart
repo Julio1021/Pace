@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+
+import 'voice.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../core/format.dart';
@@ -43,14 +45,17 @@ class Recorder extends ChangeNotifier {
   final PaceDatabase Function() _db;
   final double Function() _weightKg;
   final CoachStyle Function() _defaultStyle;
+  final String Function() _voiceName;
 
   Recorder({
     required PaceDatabase Function() db,
     required double Function() weightKg,
     CoachStyle Function()? coachStyle,
+    String Function()? voiceName,
   })  : _db = db,
         _weightKg = weightKg,
-        _defaultStyle = coachStyle ?? (() => CoachStyle.energetic);
+        _defaultStyle = coachStyle ?? (() => CoachStyle.energetic),
+        _voiceName = voiceName ?? (() => VoiceService.auto);
 
   RecState state = RecState.idle;
   RunConfig config = const RunConfig();
@@ -527,8 +532,7 @@ class Recorder extends ChangeNotifier {
     if (_tts != null) return;
     try {
       final tts = FlutterTts();
-      await tts.setLanguage('pt-BR');
-      await tts.setSpeechRate(0.5);
+      await VoiceService.apply(tts, _voiceName());
       _tts = tts;
     } catch (_) {
       _tts = null;

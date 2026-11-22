@@ -14,6 +14,7 @@ import '../../state/app_state.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/common.dart';
 import 'import_screen.dart';
+import 'voice_picker.dart';
 import 'profile_edit_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -213,6 +214,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   subtitle: const Text('O Guará dá um recado na primeira abertura do dia'),
                   value: app.introEnabled,
                   onChanged: app.setIntroEnabled,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.record_voice_over_outlined),
+                  title: const Text('Voz das falas'),
+                  subtitle: Text(app.voiceName.isEmpty ? 'Feminina (automática)' : 'Escolhida por você'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    showDragHandle: true,
+                    builder: (_) => const VoicePickerSheet(),
+                  ),
                 ),
                 const Divider(height: 1),
                 for (final s in CoachStyle.values)
