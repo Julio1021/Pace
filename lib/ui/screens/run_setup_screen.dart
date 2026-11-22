@@ -328,7 +328,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               onTap: () async {
                 await Geolocator.openLocationSettings();
               },
-            )
+            ),
           if (_batteryOk == false) ...[
             const SizedBox(height: 10),
             _Banner(
