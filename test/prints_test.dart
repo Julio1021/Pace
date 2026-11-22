@@ -23,8 +23,10 @@ import 'package:pace/ui/screens/activity_detail_screen.dart';
 import 'package:pace/ui/screens/import_screen.dart';
 import 'package:pace/ui/screens/live_run_screen.dart';
 import 'package:pace/ui/screens/profile_edit_screen.dart';
+import 'package:pace/ui/screens/run_setup_screen.dart';
 import 'package:pace/ui/shell.dart';
 import 'package:pace/ui/widgets/route_widgets.dart';
+import 'package:pace/ui/widgets/sky_scene.dart';
 import 'package:provider/provider.dart';
 
 import 'helpers.dart';
@@ -186,6 +188,27 @@ void main() {
     await _settle(tester);
     await _tab(tester, 'Correr');
     await _shot(tester, '05-correr', height: 1000);
+  }, skip: !_enabled);
+
+  testWidgets('05b céu da tela Correr em cada momento', (tester) async {
+    final sun = SunTimes.of(DateTime.now(), SkyInfo.defaultLat, SkyInfo.defaultLon);
+    final moments = <String, DateTime>{
+      'a-aurora': sun.sunrise.subtract(const Duration(minutes: 30)),
+      'b-nascer': sun.sunrise.add(const Duration(minutes: 25)),
+      'c-dia': sun.sunrise.add(const Duration(hours: 4)),
+      'd-por': sun.sunset.subtract(const Duration(minutes: 35)),
+      'e-anoitecer': sun.sunset.add(const Duration(minutes: 25)),
+      'f-noite': sun.sunset.add(const Duration(hours: 3)),
+    };
+    for (final e in moments.entries) {
+      RunSetupScreen.clock = () => e.value;
+      final env = await _makeEnv(tester);
+      await tester.pumpWidget(_wrap(env, const HomeShell()));
+      await _settle(tester);
+      await _tab(tester, 'Correr');
+      await _shot(tester, '05-correr-${e.key}', height: 900);
+    }
+    RunSetupScreen.clock = DateTime.now;
   }, skip: !_enabled);
 
   testWidgets('06 evolução', (tester) async {

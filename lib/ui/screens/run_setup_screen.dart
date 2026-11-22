@@ -14,6 +14,7 @@ import '../../services/recorder.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/pace_ui.dart';
+import '../widgets/sky_scene.dart';
 import 'live_run_screen.dart';
 
 /// Preparação da corrida: permissões, sinal de GPS e opções.
@@ -21,6 +22,9 @@ class RunSetupScreen extends StatefulWidget {
   /// Se a aba está visível (liga a prévia do GPS só quando necessário).
   final bool active;
   const RunSetupScreen({super.key, this.active = true});
+
+  /// Permite fixar o horário nas prints de teste.
+  static DateTime Function() clock = DateTime.now;
 
   @override
   State<RunSetupScreen> createState() => _RunSetupScreenState();
@@ -42,18 +46,29 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   StreamSubscription<Position>? _preview;
   bool _visible = false;
   bool _starting = false;
+  final _scroll = ScrollController();
+  final _scrollPos = ValueNotifier<double>(0);
+  Timer? _clock;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refreshStatus();
+    _scroll.addListener(() => _scrollPos.value = _scroll.offset);
+    // Atualiza o céu a cada minuto (cores mudam aos poucos).
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && widget.active) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _preview?.cancel();
+    _clock?.cancel();
+    _scroll.dispose();
+    _scrollPos.dispose();
     super.dispose();
   }
 
@@ -254,16 +269,42 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         : (_accuracy! <= 8 ? Pal.of(context).mintText : (_accuracy! <= 20 ? PaceColors.mintDark : PaceColors.orange));
 
     final pal = Pal.of(context);
-    final now = DateTime.now();
-    final phase = SkyBackground.phase(now, pal.dark);
-    final onSky = (phase.night || pal.dark) ? Colors.white : PaceColors.ink;
+    final now = RunSetupScreen.clock();
+    final app = context.watch<AppState>();
+    var lat = SkyInfo.defaultLat, lon = SkyInfo.defaultLon;
+    for (final a in app.activities) {
+      final first = a.preview.split(';').first.split(',');
+      if (first.length == 2) {
+        final la = double.tryParse(first[0]), lo = double.tryParse(first[1]);
+        if (la != null && lo != null) {
+          lat = la;
+          lon = lo;
+          break;
+        }
+      }
+    }
+    final sky = SkyInfo.at(now, lat: lat, lon: lon);
+    final onSky = sky.onSky;
+    final base = Theme.of(context);
+    final mq = MediaQuery.of(context);
+    // Os morros ficam logo abaixo do botão Iniciar.
+    final horizon = mq.padding.top + 330;
     return Scaffold(
+      backgroundColor: sky.look.ground,
       body: Stack(
         children: [
-          SkyBackground(now: now, height: 560),
+          Positioned.fill(
+            child: SkyScene(info: sky, lat: lat, scroll: _scrollPos, horizon: horizon, animate: widget.active),
+          ),
           SafeArea(
             bottom: false,
-            child: ListView(
+            child: Theme(
+              data: base.copyWith(
+                colorScheme: base.colorScheme.copyWith(onSurface: sky.onGround),
+                textTheme: base.textTheme.apply(bodyColor: sky.onGround, displayColor: sky.onGround),
+              ),
+              child: ListView(
+        controller: _scroll,
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 130),
         children: [
           Appear(
@@ -295,13 +336,12 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${Fmt.weekdayDate(now.toUtc()).split(',').first} · ${phase.label}',
+                Text('${Fmt.weekdayDate(now.toUtc()).split(',').first} · ${sky.label}',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSky.withValues(alpha: 0.75))),
                 const SizedBox(height: 2),
                 SizedBox(
                   width: 270,
-                  child: Text(phase.night ? 'Corrida noturna? Use roupa refletiva.' : 'Bom momento para sair',
-                      style: numStyle(30, color: onSky, height: 1.1)),
+                  child: Text(sky.phrase, style: numStyle(30, color: onSky, height: 1.1)),
                 ),
               ],
             ),
@@ -453,6 +493,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           ),
         ],
       ),
+            ),
           ),
         ],
       ),
