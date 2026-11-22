@@ -14,6 +14,8 @@ async def main(out):
     print(json.dumps([v["ShortName"] for v in vozes]))
     for v in vozes:
         nome = v["ShortName"].replace("pt-BR-", "").replace("Neural", "").lower()
-        await edge_tts.Communicate(TEXTO, v["ShortName"]).save(f"{out}/voz-{nome}.mp3")
+        await edge_tts.Communicate(TEXTO, v["ShortName"]).save(f"{out}/{nome}-1-normal.mp3")
+        await edge_tts.Communicate(TEXTO, v["ShortName"], rate="+12%", pitch="+8Hz").save(
+            f"{out}/{nome}-2-animada.mp3")
 
 asyncio.run(main(sys.argv[1]))
