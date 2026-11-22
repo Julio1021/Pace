@@ -253,7 +253,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     final pal = Pal.of(context);
     final now = DateTime.now();
     final phase = SkyBackground.phase(now, pal.dark);
-    final onSky = phase.night ? Colors.white : PaceColors.ink;
+    final onSky = (phase.night || pal.dark) ? Colors.white : PaceColors.ink;
     return Scaffold(
       body: Stack(
         children: [

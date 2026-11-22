@@ -299,7 +299,7 @@ class _TodayRow extends StatelessWidget {
     final sec = today ? stats.movingSec.toDouble() : last.movingSec.toDouble();
     final pace = today ? stats.avgPace : last.paceSecPerKm;
     final kcal = today ? stats.calories : (last.calories ?? 0);
-    final suffix = today ? 'hoje' : 'última';
+    final suffix = today ? 'hoje' : '(última)';
     return Row(
       children: [
         Expanded(
