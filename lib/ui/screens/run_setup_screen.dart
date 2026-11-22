@@ -255,6 +255,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           child: Center(
             child: EmptyState(
               icon: Icons.directions_run,
+              art: const Guara(pose: GuaraPose.run, size: 130),
               title: 'Corrida em andamento',
               message: 'Volte para a tela da corrida para ver tempo, distância e controles.',
               actions: [

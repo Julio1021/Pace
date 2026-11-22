@@ -14,6 +14,23 @@ class GuaraArt {
 <ellipse cx="50" cy="47" rx="5" ry="4" fill="#1F1A17"/>
 <rect x="-12" y="16" width="52" height="8" rx="4" fill="#12B886"/><path d="M-12 20 l-10 -4 l2 10z" fill="#12B886"/>
 <path d="M-8 46 Q14 62 34 58" fill="#FDF3E7"/><ellipse cx="10" cy="32" rx="4" ry="5.5" fill="#1F1A17"/><ellipse cx="26" cy="32" rx="4" ry="5.5" fill="#1F1A17"/><circle cx="11.5" cy="30" r="1.6" fill="#fff"/><circle cx="27.5" cy="30" r="1.6" fill="#fff"/><path d="M30 52 Q36 57 42 52" fill="none" stroke="#1F1A17" stroke-width="2.5" stroke-linecap="round"/></g></svg>''';
+
+  /// Aceno em duas camadas: corpo sem o braço direito + o braço, que gira no ombro.
+  static const waveBody = r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 170" width="160" height="170"><path d="M44 112 Q16 112 18 88 Q28 102 46 102" fill="#E8762E"/><path d="M18 88 Q16 80 22 78 Q24 86 26 90z" fill="#fff"/>
+<path d="M62 126 L58 150" stroke="#1F1A17" stroke-width="9" stroke-linecap="round"/><path d="M94 126 L98 150" stroke="#1F1A17" stroke-width="9" stroke-linecap="round"/>
+<path d="M44 148 h16 a5 5 0 0 1 0 9 h-20 a4 4 0 0 1 4 -9z" fill="#12B886"/><path d="M96 148 h18 a4 4 0 0 1 4 9 h-22 a5 5 0 0 1 0 -9z" fill="#12B886"/>
+<ellipse cx="78" cy="110" rx="34" ry="28" fill="#E8762E"/><ellipse cx="80" cy="114" rx="18" ry="18" fill="#FDF3E7"/>
+<path d="M50 104 L40 124" stroke="#1F1A17" stroke-width="8" stroke-linecap="round"/>
+<g transform="translate(58 30)"><path d="M-6 22 L-14 -18 L8 6z" fill="#E8762E"/><path d="M-9 14 L-12 -8 L2 6z" fill="#FDF3E7" fill-opacity=".85"/>
+<path d="M22 20 L34 -16 L38 14z" fill="#E8762E"/><path d="M26 14 L33 -6 L34 12z" fill="#FDF3E7" fill-opacity=".85"/>
+<ellipse cx="14" cy="34" rx="26" ry="22" fill="#E8762E"/>
+<path d="M14 40 Q34 38 50 46 Q46 56 30 56 Q16 54 14 40z" fill="#FDF3E7"/>
+<ellipse cx="50" cy="47" rx="5" ry="4" fill="#1F1A17"/>
+<rect x="-12" y="16" width="52" height="8" rx="4" fill="#12B886"/><path d="M-12 20 l-10 -4 l2 10z" fill="#12B886"/>
+<path d="M-8 46 Q14 62 34 58" fill="#FDF3E7"/><ellipse cx="10" cy="32" rx="4" ry="5.5" fill="#1F1A17"/><ellipse cx="26" cy="32" rx="4" ry="5.5" fill="#1F1A17"/><circle cx="11.5" cy="30" r="1.6" fill="#fff"/><circle cx="27.5" cy="30" r="1.6" fill="#fff"/><path d="M30 52 Q36 57 42 52" fill="none" stroke="#1F1A17" stroke-width="2.5" stroke-linecap="round"/></g></svg>''';
+
+  static const waveArm = r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 170" width="160" height="170"><path d="M106 100 L124 74" stroke="#1F1A17" stroke-width="8" stroke-linecap="round"/></svg>''';
+
   static const run = r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 172 170" width="172" height="170"><path d="M4 92 h14" stroke="#9BE3C8" stroke-width="3" stroke-linecap="round"/><path d="M0 106 h18" stroke="#9BE3C8" stroke-width="3" stroke-linecap="round"/>
 <path d="M34 96 Q10 92 14 70 Q24 86 40 86" fill="#E8762E"/><path d="M14 70 Q12 62 18 60 Q20 68 22 72z" fill="#fff"/>
 <path d="M62 112 L52 146" stroke="#1F1A17" stroke-width="9" stroke-linecap="round"/><path d="M38 146 h16 a5 5 0 0 1 0 9 h-20 a4 4 0 0 1 4 -9z" fill="#12B886"/>

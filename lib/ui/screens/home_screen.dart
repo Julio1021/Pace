@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../../domain/coach.dart';
 import '../../domain/models.dart';
 import '../../domain/stats.dart';
 import '../../state/app_state.dart';
@@ -39,45 +44,21 @@ class HomeScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 14, 18, 130),
                 children: [
-                  Appear(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(Fmt.weekdayDate(now.toUtc()),
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted)),
-                              const SizedBox(height: 2),
-                              Text('${_greeting(now)}, $first', style: numStyle(28, color: p.ink)),
-                            ],
-                          ),
-                        ),
-                        Semantics(
-                          button: true,
-                          label: 'Perfil',
-                          child: GestureDetector(
-                            onTap: () => HomeShell.of(context)?.go(4),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(15),
-                                gradient: const LinearGradient(colors: [PaceColors.mint, PaceColors.mintDark]),
-                              ),
-                              child: Text(prof.initials, style: numStyle(16, color: Colors.white)),
-                            ),
-                          ),
-                        ),
-                      ],
+                  if (last == null) ...[
+                    Appear(
+                      child: _Header(date: Fmt.weekdayDate(now.toUtc()), greeting: '${_greeting(now)}, $first'),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (last == null)
-                    Appear(delayMs: 80, child: _EmptyHome())
-                  else ...[
-                    Appear(delayMs: 80, child: _GoalCard(app: app, now: now)),
+                    const SizedBox(height: 16),
+                    Appear(delayMs: 80, child: _EmptyHome()),
+                  ] else ...[
+                    Appear(
+                      child: _HomeTop(
+                        date: Fmt.weekdayDate(now.toUtc()),
+                        greeting: '${_greeting(now)}, $first',
+                        mood: _GuaraMood.of(app, now, first),
+                        card: _GoalCard(app: app, now: now),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Appear(delayMs: 160, child: _TodayRow(stats: app.dayStats(now), last: last, now: now)),
                     const SizedBox(height: 12),
@@ -169,6 +150,228 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     ];
+  }
+}
+
+/// Data e saudação no topo.
+class _Header extends StatelessWidget {
+  final String date;
+  final String greeting;
+  final double rightGap;
+  const _Header({required this.date, required this.greeting, this.rightGap = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Padding(
+      padding: EdgeInsets.only(right: rightGap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(date, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.muted)),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(greeting, style: numStyle(28, color: p.ink)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Como o Guará está agora, e o que ele diz quando é tocado.
+class _GuaraMood {
+  final GuaraPose pose;
+  final List<String> lines;
+  final bool callsToRun;
+  const _GuaraMood(this.pose, this.lines, {this.callsToRun = false});
+
+  static _GuaraMood of(AppState app, DateTime now, String first) {
+    final h = now.hour;
+    final goal = app.profile.weeklyGoalKm;
+    final week = app.weekStats(now);
+    final met = goal > 0 && week.distanceM / 1000 >= goal;
+    final last = app.activities.isEmpty ? null : app.activities.first;
+    final days = last == null ? 0 : now.toUtc().difference(last.start).inDays;
+    final name = first.isEmpty ? '' : ', $first';
+    if (h >= 22 || h < 5) {
+      return const _GuaraMood(GuaraPose.sleep, [
+        'Zzz… descanso também é treino.',
+        'Amanhã a gente corre!',
+        'Dormir bem deixa o pace mais leve.',
+      ]);
+    }
+    if (met) {
+      return const _GuaraMood(GuaraPose.celebrate, [
+        'Meta da semana batida! Que semana!',
+        'Você mandou muito bem.',
+        'Agora é manter o ritmo, sem exagero.',
+      ]);
+    }
+    if (days >= 3) {
+      return _GuaraMood(
+        GuaraPose.run,
+        ['$days dias sem correr… bora?', 'Só 20 minutinhos já valem!', 'Seu tênis está com saudade.'],
+        callsToRun: true,
+      );
+    }
+    return _GuaraMood(GuaraPose.wave, [
+      'Oi$name! Bora correr hoje?',
+      ...CoachPhrases.daily.take(6),
+    ]);
+  }
+}
+
+/// Topo da tela Início: saudação, card da meta e o Guará sentado em cima do card.
+class _HomeTop extends StatefulWidget {
+  final String date;
+  final String greeting;
+  final _GuaraMood mood;
+  final Widget card;
+  const _HomeTop({required this.date, required this.greeting, required this.mood, required this.card});
+
+  @override
+  State<_HomeTop> createState() => _HomeTopState();
+}
+
+class _HomeTopState extends State<_HomeTop> with SingleTickerProviderStateMixin {
+  static const _headerH = 66.0;
+  static const _gap = 16.0;
+  static const _size = 78.0;
+
+  late final AnimationController _jump = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
+  String? _line;
+  int _next = 0;
+  int _waveTick = 0;
+  Timer? _hide;
+
+  @override
+  void dispose() {
+    _jump.dispose();
+    _hide?.cancel();
+    super.dispose();
+  }
+
+  void _tap() {
+    HapticFeedback.selectionClick();
+    final lines = widget.mood.lines;
+    setState(() {
+      _line = lines[_next++ % lines.length];
+      _waveTick++;
+    });
+    if (motionOn(context)) _jump.forward(from: 0);
+    _hide?.cancel();
+    _hide = Timer(const Duration(milliseconds: 3200), () {
+      if (mounted) setState(() => _line = null);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mood = widget.mood;
+    // Onde ficam os pés em cada desenho (fração da altura), para ele "sentar" no card.
+    final feet = switch (mood.pose) {
+      GuaraPose.sleep => 0.88,
+      GuaraPose.run => 0.9,
+      _ => 0.93,
+    };
+    final h = _size * 170 / 160;
+    final top = _headerH + _gap - h * feet;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: _headerH,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _Header(date: widget.date, greeting: widget.greeting, rightGap: _size + 12),
+              ),
+            ),
+            const SizedBox(height: _gap),
+            widget.card,
+          ],
+        ),
+        Positioned(
+          right: 14,
+          top: top,
+          child: Semantics(
+            button: true,
+            label: 'Guará, toque para uma mensagem',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _tap,
+              child: AnimatedBuilder(
+                animation: _jump,
+                builder: (context, child) {
+                  final v = _jump.value;
+                  final up = v < 0.6 ? math.sin(v / 0.6 * math.pi) * 16 : math.sin((v - 0.6) / 0.4 * math.pi) * 3;
+                  return Transform.translate(offset: Offset(0, -up), child: child);
+                },
+                child: Guara(
+                  key: ValueKey(mood.pose),
+                  pose: mood.pose,
+                  size: _size,
+                  waves: 3,
+                  waveTrigger: _waveTick,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: _size + 18,
+          top: 2,
+          child: IgnorePointer(
+            ignoring: _line == null,
+            child: AnimatedOpacity(
+              opacity: _line == null ? 0 : 1,
+              duration: const Duration(milliseconds: 220),
+              child: AnimatedSlide(
+                offset: _line == null ? const Offset(0.05, 0.15) : Offset.zero,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutBack,
+                child: GestureDetector(
+                  onTap: mood.callsToRun ? () => HomeShell.of(context)?.go(2) : null,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(4),
+                      ),
+                      boxShadow: const [BoxShadow(color: Color(0x260F172A), blurRadius: 16, offset: Offset(0, 6))],
+                      border: Border.all(color: const Color(0x140F172A)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_line ?? '',
+                            style: const TextStyle(fontSize: 13.5, height: 1.3, color: PaceColors.ink, fontWeight: FontWeight.w600)),
+                        if (mood.callsToRun) ...[
+                          const SizedBox(height: 4),
+                          const Text('Correr agora ›',
+                              style: TextStyle(fontSize: 12.5, color: PaceColors.mintDark, fontWeight: FontWeight.w800)),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -131,6 +131,9 @@ class GlassCard extends StatelessWidget {
             border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
           ),
           child: Stack(
+            // Passa a largura do pai: sem isso o vidro encolhia até o conteúdo
+            // e a sombra ficava "sobrando" ao lado (cards Tempo/Pace/kcal).
+            fit: StackFit.passthrough,
             children: [
               blur ? BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: tinted) : tinted,
               // Filete de luz no topo (borda do vidro).

@@ -189,6 +189,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   SliverToBoxAdapter(
                     child: EmptyState(
                       icon: Icons.filter_alt_off,
+                      art: const Guara(pose: GuaraPose.sleep, size: 110),
                       title: 'Nada com esses filtros',
                       message: 'Mude o período ou a faixa de distância.',
                     ),

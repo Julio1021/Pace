@@ -193,7 +193,10 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Guara(pose: GuaraPose.run, size: 54),
+                              Guara(
+                                pose: (rec.goalProgress ?? 0) >= 1 ? GuaraPose.celebrate : GuaraPose.run,
+                                size: 54,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
