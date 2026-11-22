@@ -23,11 +23,14 @@ import 'import_screen.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  /// Permite fixar o horário nas prints de teste.
+  static DateTime Function() clock = DateTime.now;
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final p = Pal.of(context);
-    final now = DateTime.now();
+    final now = clock();
     final prof = app.profile;
     final first = prof.name.trim().split(' ').first;
     final last = app.activities.isEmpty ? null : app.activities.first;
@@ -109,7 +112,7 @@ class HomeScreen extends StatelessWidget {
     } else if (week.count > 0 && left <= 0) {
       out.add('Meta da semana cumprida com ${Fmt.kmUnit(week.distanceM, decimals: 1)}. Lembre de reservar um dia de descanso.');
     }
-    final days = DateTime.now().toUtc().difference(last.start).inDays;
+    final days = now.toUtc().difference(last.start).inDays;
     if (days >= 7) out.add('Sua última corrida foi há $days dias. Que tal uma rodagem leve hoje?');
     if (out.isEmpty) return const [];
     final p = Pal.of(context);
@@ -273,7 +276,7 @@ class _HomeTopState extends State<_HomeTop> with SingleTickerProviderStateMixin 
     final mood = widget.mood;
     // Onde ficam os pés em cada desenho (fração da altura), para ele "sentar" no card.
     final feet = switch (mood.pose) {
-      GuaraPose.sleep => 0.88,
+      GuaraPose.sleep => 0.93,
       GuaraPose.run => 0.9,
       _ => 0.93,
     };

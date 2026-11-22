@@ -20,6 +20,7 @@ import 'package:pace/services/recorder.dart';
 import 'package:pace/state/app_state.dart';
 import 'package:pace/ui/intro_overlay.dart';
 import 'package:pace/ui/screens/activity_detail_screen.dart';
+import 'package:pace/ui/screens/home_screen.dart';
 import 'package:pace/ui/screens/import_screen.dart';
 import 'package:pace/ui/screens/live_run_screen.dart';
 import 'package:pace/ui/screens/profile_edit_screen.dart';
@@ -172,6 +173,26 @@ void main() {
     final env = await _makeEnv(tester);
     await tester.pumpWidget(_wrap(env, const HomeShell()));
     await _shot(tester, '02-inicio', height: 1700);
+  }, skip: !_enabled);
+
+  testWidgets('02b Guará do Início em cada humor', (tester) async {
+    final n = DateTime.now();
+    final day = DateTime(n.year, n.month, n.day, 10);
+    final cases = <String, (DateTime, double)>{
+      'a-acenando': (day, 200),
+      'b-comemorando': (day, 20),
+      'c-chamando': (day.add(const Duration(days: 15)), 20),
+      'd-dormindo': (DateTime(n.year, n.month, n.day, 23), 20),
+    };
+    for (final e in cases.entries) {
+      HomeScreen.clock = () => e.value.$1;
+      final env = await _makeEnv(tester);
+      await tester.runAsync(() => env.app.saveProfile(env.app.profile.copyWith(weeklyGoalKm: e.value.$2)));
+      await tester.pumpWidget(_wrap(env, const HomeShell()));
+      await _settle(tester);
+      await _shot(tester, '02-inicio-${e.key}', height: 420);
+    }
+    HomeScreen.clock = DateTime.now;
   }, skip: !_enabled);
 
   testWidgets('04 histórico', (tester) async {
