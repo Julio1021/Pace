@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../services/recorder.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
+import '../widgets/guara.dart';
 import '../widgets/route_widgets.dart';
 import 'activity_detail_screen.dart';
 
@@ -134,6 +135,39 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                     ),
                   ],
                 ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (c, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SizeTransition(sizeFactor: anim, child: c),
+                ),
+                child: rec.visibleCoachMessage == null
+                    ? const SizedBox(key: ValueKey('none'), width: double.infinity)
+                    : Padding(
+                        key: ValueKey(rec.coachMessage),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(8, 6, 16, 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16302A),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: PaceColors.mintBright.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Guara(pose: GuaraPose.run, size: 54),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  rec.coachMessage!,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
               ),
               Expanded(
                 child: _showMap

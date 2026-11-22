@@ -12,6 +12,7 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/exporters.dart';
 import '../../domain/calc.dart';
+import '../../domain/coach.dart';
 import '../../domain/models.dart';
 import '../../state/app_state.dart';
 import '../widgets/pace_ui.dart';
@@ -222,9 +223,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Mandou bem!', style: numStyle(20, color: Pal.of(context).ink)),
+                          Text(CoachPhrases.resultTitles[a.id! % CoachPhrases.resultTitles.length],
+                              style: numStyle(20, color: Pal.of(context).ink)),
                           const SizedBox(height: 2),
-                          const Text('Sua corrida foi salva no histórico.'),
+                          Text('${CoachPhrases.resultLines[a.id! % CoachPhrases.resultLines.length]} '
+                              'Sua corrida foi salva no histórico.'),
                         ],
                       ),
                     ),

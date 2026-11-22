@@ -12,7 +12,11 @@ Future<void> main() async {
   Intl.defaultLocale = 'pt_BR';
   await initializeDateFormatting('pt_BR');
   final state = AppState();
-  final recorder = Recorder(db: () => state.db, weightKg: () => state.profile.weightForCalc);
+  final recorder = Recorder(
+    db: () => state.db,
+    weightKg: () => state.profile.weightForCalc,
+    coachStyle: () => state.coachStyle,
+  );
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: state),

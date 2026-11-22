@@ -8,8 +8,10 @@ import 'package:provider/provider.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../domain/calc.dart';
+import '../../domain/coach.dart';
 import '../../domain/models.dart';
 import '../../services/recorder.dart';
+import '../../state/app_state.dart';
 import '../widgets/common.dart';
 import '../widgets/pace_ui.dart';
 import 'live_run_screen.dart';
@@ -202,6 +204,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         autoPause: _autoPause,
         voice: _voice,
         type: _type,
+        coachStyle: context.read<AppState>().coachStyle,
       );
       await rec.start(cfg);
       if (!mounted) return;
@@ -417,6 +420,26 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                   value: _autoPause,
                   onChanged: (v) => setState(() => _autoPause = v),
                 ),
+                const Divider(height: 1),
+                Builder(builder: (context) {
+                  final app = context.watch<AppState>();
+                  return ListTile(
+                    leading: const Icon(Icons.campaign_outlined),
+                    title: const Text('Mensagens de incentivo'),
+                    subtitle: Text(app.coachStyle.hint),
+                    trailing: DropdownButton<CoachStyle>(
+                      value: app.coachStyle,
+                      underline: const SizedBox(),
+                      items: [
+                        for (final s in CoachStyle.values)
+                          DropdownMenuItem(value: s, child: Text(s.label.split(' ').first)),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) app.setCoachStyle(v);
+                      },
+                    ),
+                  );
+                }),
                 const Divider(height: 1),
                 SwitchListTile(
                   secondary: const Icon(Icons.record_voice_over_outlined),

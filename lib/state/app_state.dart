@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/database.dart';
+import '../domain/coach.dart';
 import '../domain/models.dart';
 import '../domain/stats.dart';
 
@@ -14,6 +15,9 @@ class AppState extends ChangeNotifier {
 
   /// Animação de abertura com o Guará (uma vez por dia).
   bool introEnabled = true;
+
+  /// Estilo das mensagens durante a corrida.
+  CoachStyle coachStyle = CoachStyle.energetic;
   bool showIntroNow = false;
 
   PaceDatabase get db => _db!;
@@ -24,6 +28,7 @@ class AppState extends ChangeNotifier {
       profile = await db.getProfile();
       activities = await db.listActivities();
       introEnabled = (await db.getKv('intro_enabled')) != '0';
+      coachStyle = CoachStyleX.parse(await db.getKv('coach_style'));
       final last = await db.getKv('intro_last_day');
       final open = await db.listActivities(status: ActivityStatus.inProgress);
       final today = _dayKey(DateTime.now());
@@ -42,6 +47,12 @@ class AppState extends ChangeNotifier {
     showIntroNow = false;
     notifyListeners();
     await db.setKv('intro_last_day', _dayKey(DateTime.now()));
+  }
+
+  Future<void> setCoachStyle(CoachStyle s) async {
+    coachStyle = s;
+    notifyListeners();
+    await db.setKv('coach_style', s.key);
   }
 
   Future<void> setIntroEnabled(bool v) async {

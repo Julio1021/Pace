@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import '../core/format.dart';
 import '../data/database.dart';
 import '../domain/calc.dart';
+import '../domain/coach.dart';
 import '../domain/models.dart';
 
 enum GoalType { none, distance, time }
@@ -20,6 +21,7 @@ class RunConfig {
   final bool autoPause;
   final bool voice;
   final String type;
+  final CoachStyle coachStyle;
 
   const RunConfig({
     this.goalType = GoalType.none,
@@ -28,6 +30,7 @@ class RunConfig {
     this.autoPause = true,
     this.voice = true,
     this.type = 'Corrida livre',
+    this.coachStyle = CoachStyle.energetic,
   });
 }
 
@@ -39,10 +42,15 @@ enum RecState { idle, running, paused, finished }
 class Recorder extends ChangeNotifier {
   final PaceDatabase Function() _db;
   final double Function() _weightKg;
+  final CoachStyle Function() _defaultStyle;
 
-  Recorder({required PaceDatabase Function() db, required double Function() weightKg})
-      : _db = db,
-        _weightKg = weightKg;
+  Recorder({
+    required PaceDatabase Function() db,
+    required double Function() weightKg,
+    CoachStyle Function()? coachStyle,
+  })  : _db = db,
+        _weightKg = weightKg,
+        _defaultStyle = coachStyle ?? (() => CoachStyle.energetic);
 
   RecState state = RecState.idle;
   RunConfig config = const RunConfig();
@@ -59,6 +67,11 @@ class Recorder extends ChangeNotifier {
   double? speed;
   bool autoPaused = false;
   String? gpsWarning;
+
+  /// Última frase de incentivo (mostrada também na tela, por alguns segundos).
+  String? coachMessage;
+  DateTime? coachMessageAt;
+  Coach _coach = Coach(style: CoachStyle.off);
 
   StreamSubscription<Position>? _sub;
   Timer? _ticker;
@@ -122,9 +135,12 @@ class Recorder extends ChangeNotifier {
     state = RecState.running;
     _clock = DateTime.now();
     _nextLap = cfg.autoLapM;
+    _coach = Coach(style: cfg.coachStyle, hasGoal: cfg.goalType != GoalType.none, isRace: cfg.type == 'Prova');
     await _initTts();
     _listen();
-    _say('Corrida iniciada.');
+    final hi = _coach.onStart();
+    _say(hi == null ? 'Corrida iniciada.' : 'Corrida iniciada. $hi');
+    _showCoach(hi);
     notifyListeners();
   }
 
@@ -136,7 +152,8 @@ class Recorder extends ChangeNotifier {
     final pts = await db.getPoints(a.id!);
     activityId = a.id;
     startTime = a.start;
-    config = RunConfig(type: a.type);
+    config = RunConfig(type: a.type, coachStyle: _defaultStyle());
+    _coach = Coach(style: config.coachStyle);
     points.addAll(pts);
     _savedCount = pts.length;
     laps.addAll(await db.getLaps(a.id!));
@@ -182,7 +199,9 @@ class Recorder extends ChangeNotifier {
     _autoPause.reset();
     autoPaused = false;
     HapticFeedback.mediumImpact();
-    _say('Retomando.');
+    final msg = _coach.onResume(moving);
+    _say(msg == null ? 'Retomando.' : 'Retomando. $msg');
+    _showCoach(msg);
     notifyListeners();
   }
 
@@ -206,7 +225,8 @@ class Recorder extends ChangeNotifier {
       final id = activityId!;
       await finalizeActivity(_db(), id, weightKg: _weightKg(), extraLaps: laps, endTime: DateTime.now().toUtc());
       state = RecState.finished;
-      _say('Corrida encerrada. ${Fmt.km(distance).replaceAll(',', ' vírgula ')} quilômetros.');
+      final bye = _coach.onFinish(moving);
+      _say('Corrida encerrada. ${Fmt.km(distance).replaceAll(',', ' vírgula ')} quilômetros.${bye == null ? '' : ' $bye'}');
       notifyListeners();
       return id;
     } finally {
@@ -380,6 +400,14 @@ class Recorder extends ChangeNotifier {
       _checkSplits();
       _checkAutoLap();
       _checkGoal();
+      final gp = goalProgress;
+      if (gp != null && gp < 1) {
+        final msg = _coach.onProgress(gp, moving);
+        if (msg != null) {
+          _say(msg);
+          _showCoach(msg);
+        }
+      }
     }
     _prevMov = moving;
     _prevDist = distance;
@@ -403,13 +431,18 @@ class Recorder extends ChangeNotifier {
       _lastSplitMov = cross;
       _nextKm += 1000;
       HapticFeedback.heavyImpact();
+      final km = splits.length;
+      final prev = splits.length > 1 ? splits.sublist(0, splits.length - 1) : const <Split>[];
+      final avgPrev = prev.isEmpty ? null : prev.fold<double>(0, (t, x) => t + x.sec) / prev.length;
+      final msg = _coach.onKm(km, moving, splitSec: sec, avgPrevSec: avgPrev);
       if (config.voice) {
-        final km = splits.length;
         _say('$km ${km == 1 ? 'quilômetro' : 'quilômetros'}. '
             'Tempo ${_spokenDuration(moving)}. '
             'Último quilômetro em ${_spokenDuration(sec)}. '
-            'Pace médio ${_spokenDuration(avgPace ?? 0)}.');
+            'Pace médio ${_spokenDuration(avgPace ?? 0)}.'
+            '${msg == null ? '' : ' $msg'}');
       }
+      _showCoach(msg);
     }
   }
 
@@ -445,7 +478,9 @@ class Recorder extends ChangeNotifier {
     if (reached) {
       _goalAnnounced = true;
       HapticFeedback.heavyImpact();
-      _say('Meta atingida! Parabéns.', force: true);
+      final msg = _coach.onGoalReached(moving);
+      _say(msg == null ? 'Meta atingida!' : 'Meta atingida! $msg', force: true);
+      _showCoach(msg ?? 'Meta atingida!');
     }
   }
 
@@ -471,6 +506,19 @@ class Recorder extends ChangeNotifier {
       _pending.insertAll(0, batch);
       _savedCount = first;
     }
+  }
+
+  void _showCoach(String? msg) {
+    if (msg == null) return;
+    coachMessage = msg;
+    coachMessageAt = DateTime.now();
+  }
+
+  /// Frase a mostrar agora (some depois de 4 s).
+  String? get visibleCoachMessage {
+    final at = coachMessageAt;
+    if (at == null || DateTime.now().difference(at).inSeconds >= 4) return null;
+    return coachMessage;
   }
 
   // ---------------- Voz ----------------
@@ -523,6 +571,8 @@ class Recorder extends ChangeNotifier {
     speed = null;
     autoPaused = false;
     gpsWarning = null;
+    coachMessage = null;
+    coachMessageAt = null;
     _clock = null;
     _lastAccepted = null;
     _segmentBreak = false;

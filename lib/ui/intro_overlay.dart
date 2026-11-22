@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../core/format.dart';
 import '../core/theme.dart';
+import '../domain/coach.dart';
 import '../domain/stats.dart';
 import '../state/app_state.dart';
 import 'widgets/guara.dart';
@@ -41,13 +42,7 @@ import 'widgets/pace_ui.dart';
       pose: GuaraPose.wave,
     );
   }
-  const tips = [
-    'Cada km conta.',
-    'Constância vence pressa.',
-    'O melhor treino é o que você faz.',
-    'Um passo de cada vez.',
-    'Hidrate-se e bora!',
-  ];
+  const tips = CoachPhrases.daily;
   final tip = tips[(now.year * 400 + now.month * 31 + now.day) % tips.length];
   return (text: '$hello, $first! $tip', pose: GuaraPose.wave);
 }

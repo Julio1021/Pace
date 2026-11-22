@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/exporters.dart';
+import '../../domain/coach.dart';
 import '../../state/app_state.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/common.dart';
@@ -201,15 +202,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          const SectionTitle('Aparência'),
+          const SectionTitle('Aparência e mensagens'),
           PaceCard(
             padding: EdgeInsets.zero,
-            child: SwitchListTile(
-              secondary: const Icon(Icons.auto_awesome_outlined),
-              title: const Text('Animação de abertura'),
-              subtitle: const Text('O Guará dá um recado na primeira abertura do dia'),
-              value: app.introEnabled,
-              onChanged: app.setIntroEnabled,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.auto_awesome_outlined),
+                  title: const Text('Animação de abertura'),
+                  subtitle: const Text('O Guará dá um recado na primeira abertura do dia'),
+                  value: app.introEnabled,
+                  onChanged: app.setIntroEnabled,
+                ),
+                const Divider(height: 1),
+                for (final s in CoachStyle.values)
+                  ListTile(
+                    leading: Icon(
+                      app.coachStyle == s ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      color: app.coachStyle == s ? PaceColors.mintBright : null,
+                    ),
+                    title: Text(s.label),
+                    subtitle: Text(s.hint),
+                    onTap: () => app.setCoachStyle(s),
+                  ),
+              ],
             ),
           ),
           const SectionTitle('Sobre'),
