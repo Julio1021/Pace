@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../core/format.dart';
+import 'run_notification.dart';
 import 'speech.dart';
 import 'voice.dart';
 import 'package:geolocator/geolocator.dart';
@@ -54,7 +56,16 @@ class Recorder extends ChangeNotifier {
   })  : _db = db,
         _weightKg = weightKg,
         _defaultStyle = coachStyle ?? (() => CoachStyle.energetic),
-        _voiceName = voiceName ?? (() => VoiceService.auto);
+        _voiceName = voiceName ?? (() => VoiceService.auto) {
+    RunNotification.onAction = (a) {
+      if (a != 'toggle') return;
+      if (state == RecState.running) {
+        pause();
+      } else if (state == RecState.paused) {
+        resume();
+      }
+    };
+  }
 
   RecState state = RecState.idle;
   RunConfig config = const RunConfig();
@@ -95,6 +106,8 @@ class Recorder extends ChangeNotifier {
   DateTime _lastFlush = DateTime.now();
   final _autoPause = AutoPause();
   final _paceWindow = PaceWindow();
+  final _smoother = GpsSmoother();
+  DateTime? _lastRawTime;
   final _speaker = Speaker();
   bool _busy = false;
 
@@ -142,6 +155,7 @@ class Recorder extends ChangeNotifier {
     _coach = Coach(style: cfg.coachStyle, hasGoal: cfg.goalType != GoalType.none, isRace: cfg.type == 'Prova');
     await _initTts();
     _listen();
+    _notify(force: true);
     final hi = _coach.onStart();
     _say(['Corrida iniciada.', hi]);
     _showCoach(hi);
@@ -181,6 +195,7 @@ class Recorder extends ChangeNotifier {
     _clock = DateTime.now();
     await _initTts();
     _listen();
+    _notify(force: true);
     _say(['Corrida retomada.']);
     notifyListeners();
   }
@@ -192,6 +207,7 @@ class Recorder extends ChangeNotifier {
     _paceWindow.clear();
     HapticFeedback.mediumImpact();
     _say(['Corrida pausada.']);
+    _notify(force: true);
     notifyListeners();
   }
 
@@ -206,6 +222,7 @@ class Recorder extends ChangeNotifier {
     final msg = _coach.onResume(moving);
     _say(['Retomando.', msg]);
     _showCoach(msg);
+    _notify(force: true);
     notifyListeners();
   }
 
@@ -309,11 +326,13 @@ class Recorder extends ChangeNotifier {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (state == RecState.running) _advanceClock(DateTime.now());
       if (_pending.isNotEmpty && DateTime.now().difference(_lastFlush).inSeconds >= 5) _flush();
+      _notify();
       notifyListeners();
     });
   }
 
   Future<void> _stopStream() async {
+    RunNotification.cancel();
     _ticker?.cancel();
     _ticker = null;
     await _sub?.cancel();
@@ -337,6 +356,14 @@ class Recorder extends ChangeNotifier {
     final t = p.timestamp.toUtc();
     accuracy = p.accuracy;
     gpsWarning = p.accuracy > GpsFilter.maxAccuracyM ? 'Sinal de GPS fraco' : null;
+    // Descarta localização simulada, pontos antigos do cache (de antes do início)
+    // e repetidos/fora de ordem.
+    if (p.isMocked) return;
+    final st = startTime;
+    if (st != null && t.isBefore(st.subtract(const Duration(seconds: 2)))) return;
+    final prevRaw = _lastRawTime;
+    if (prevRaw != null && !t.isAfter(prevRaw)) return;
+    _lastRawTime = t;
 
     // Velocidade: a do GPS quando disponível; senão, calculada em relação ao último ponto.
     var v = p.speed;
@@ -357,38 +384,53 @@ class Recorder extends ChangeNotifier {
           autoPaused = true;
           _paceWindow.clear();
           _say(['Pausa automática.']);
+          _notify(force: true);
         } else {
           _clock = now;
           autoPaused = false;
           _say(['Retomando.']);
+          _notify(force: true);
         }
       }
     }
     _advanceClock(now);
 
+    // Ponto impreciso com a pessoa parada só atrapalha.
+    if (p.accuracy > GpsFilter.maxAccuracyM && v < AutoPause.pauseBelow) {
+      notifyListeners();
+      return;
+    }
+    if (p.accuracy > GpsFilter.maxInputAccuracyM) {
+      notifyListeners();
+      return;
+    }
+    if (_segmentBreak) _smoother.reset();
+    final sm = _smoother.update(p.latitude, p.longitude, p.accuracy, t);
+
     final verdict = GpsFilter.check(
       accuracy: p.accuracy,
-      lat: p.latitude,
-      lon: p.longitude,
+      lat: sm.lat,
+      lon: sm.lon,
       time: t,
       lastAccepted: _segmentBreak ? null : last,
     );
     if (verdict != GpsVerdict.accept) {
+      if (verdict == GpsVerdict.impossibleJump) _smoother.reset();
       notifyListeners();
       return;
     }
 
     var d = 0.0;
     if (last != null && !_segmentBreak && !autoPaused) {
-      d = Calc.haversine(last.lat, last.lon, p.latitude, p.longitude);
+      d = Calc.haversine(last.lat, last.lon, sm.lat, sm.lon);
     }
     _segmentBreak = false;
     distance += d;
     final point = TrackPoint(
       time: t,
-      lat: p.latitude,
-      lon: p.longitude,
-      alt: p.altitude == 0 ? null : p.altitude,
+      lat: sm.lat,
+      lon: sm.lon,
+      alt: p.altitude == 0 || p.altitudeAccuracy > 20 ? null : p.altitude,
       accuracy: p.accuracy,
       speed: v,
       dist: distance,
@@ -452,6 +494,7 @@ class Recorder extends ChangeNotifier {
         ]);
       }
       _showCoach(msg);
+      _notify(force: true);
     }
   }
 
@@ -573,6 +616,52 @@ class Recorder extends ChangeNotifier {
     _savedCount = 0;
     _autoPause.reset();
     _paceWindow.clear();
+    _smoother.reset();
+    _lastRawTime = null;
+    _lastNotify = null;
+    RunNotification.cancel();
+  }
+
+  // ---------------- Notificação ao vivo ----------------
+
+  DateTime? _lastNotify;
+
+  void _notify({bool force = false}) {
+    if (!isActive) return;
+    final now = DateTime.now();
+    final last = _lastNotify;
+    if (!force && last != null && now.difference(last).inSeconds < 4) return;
+    _lastNotify = now;
+    final km = Fmt.km(distance);
+    final stopped = state == RecState.paused || autoPaused;
+    final title = state == RecState.paused
+        ? 'Pausada · $km km'
+        : autoPaused
+            ? 'Pausa automática · $km km'
+            : 'Correndo · $km km';
+    final lines = <String>[];
+    if (stopped) {
+      lines.add('Tempo ${Fmt.duration(moving)} · Pace médio ${Fmt.pace(avgPace)} /km');
+    } else {
+      lines.add('Pace ${Fmt.pace(currentPace)} /km · Média ${Fmt.pace(avgPace)} /km');
+    }
+    final gp = goalProgress;
+    if (gp != null) {
+      lines.add(gp >= 1
+          ? 'Meta atingida!'
+          : config.goalType == GoalType.distance
+              ? 'Meta: $km de ${Fmt.km(config.goalValue)} km'
+              : 'Meta: ${Fmt.duration(moving)} de ${Fmt.duration(config.goalValue)}');
+    }
+    if (gpsWarning != null && !stopped) lines.add(gpsWarning!);
+    RunNotification.show(
+      title: title,
+      text: lines.join('\n'),
+      chip: '$km km',
+      paused: stopped,
+      movingSec: moving,
+      progress: gp,
+    );
   }
 
   @override

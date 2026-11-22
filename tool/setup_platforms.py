@@ -43,6 +43,16 @@ def main():
                 shutil.copy(f, dst)
         done("ícone do app (Guará)")
 
+    kt_src = PLAT / "kotlin"
+    if kt_src.exists():
+        kt_dst = app / "src" / "main" / "kotlin" / "br" / "com" / "julio" / "pace"
+        kt_dst.mkdir(parents=True, exist_ok=True)
+        for old in (app / "src" / "main").rglob("MainActivity.*"):
+            old.unlink()
+        for f in kt_src.glob("*.kt"):
+            shutil.copy(f, kt_dst / f.name)
+        done("código nativo (notificação ao vivo da corrida)")
+
     kts = app / "build.gradle.kts"
     groovy = app / "build.gradle"
     signing = bool(STORE and STORE_PASS and pathlib.Path(STORE).exists())

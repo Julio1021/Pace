@@ -192,7 +192,11 @@ enum GpsVerdict { accept, badAccuracy, impossibleJump, tooClose }
 /// mais de 9 m/s (32 km/h) em relação ao último aceito é descartado; deslocamentos
 /// menores que 3 m são tremulação (parado).
 class GpsFilter {
+  /// Sinal considerado bom (aviso e confirmação para iniciar).
   static const maxAccuracyM = 20.0;
+
+  /// Pontos entre 20 e 30 m ainda entram, com peso menor no filtro de suavização.
+  static const maxInputAccuracyM = 30.0;
   static const maxSpeedMps = 9.0;
   static const minMoveM = 3.0;
 
@@ -203,13 +207,15 @@ class GpsFilter {
     required DateTime time,
     TrackPoint? lastAccepted,
   }) {
-    if (accuracy > maxAccuracyM) return GpsVerdict.badAccuracy;
+    if (accuracy > maxInputAccuracyM || !accuracy.isFinite) return GpsVerdict.badAccuracy;
     final last = lastAccepted;
-    if (last == null) return GpsVerdict.accept;
+    if (last == null) return accuracy > maxAccuracyM ? GpsVerdict.badAccuracy : GpsVerdict.accept;
     final d = Calc.haversine(last.lat, last.lon, lat, lon);
     final dt = time.difference(last.time).inMilliseconds / 1000.0;
-    if (dt > 0 && d / dt > maxSpeedMps) return GpsVerdict.impossibleJump;
-    if (d < minMoveM) return GpsVerdict.tooClose;
+    if (dt <= 0) return GpsVerdict.tooClose;
+    if (d / dt > maxSpeedMps) return GpsVerdict.impossibleJump;
+    // Parado, o GPS "passeia" alguns metros; o mínimo cresce com a imprecisão.
+    if (d < math.max(minMoveM, accuracy * 0.4)) return GpsVerdict.tooClose;
     return GpsVerdict.accept;
   }
 
@@ -219,6 +225,44 @@ class GpsFilter {
     if (accuracy <= 8) return 'Ótimo';
     if (accuracy <= 20) return 'Bom';
     return 'Fraco';
+  }
+}
+
+/// Filtro de Kalman simples para latitude/longitude: suaviza o zigue-zague
+/// do GPS dando mais peso aos pontos precisos. Evita somar distância
+/// fantasma em ruas com prédios ou árvores.
+class GpsSmoother {
+  /// Quanto a posição pode mudar por segundo (m/s) — corrida rápida, com folga.
+  static const q = 3.5;
+  double? _lat, _lon;
+  double _var = -1;
+  DateTime? _t;
+
+  void reset() {
+    _var = -1;
+    _lat = _lon = null;
+    _t = null;
+  }
+
+  ({double lat, double lon}) update(double lat, double lon, double accuracy, DateTime time) {
+    final acc = math.max(accuracy, 1.0);
+    if (_var < 0 || _lat == null) {
+      _lat = lat;
+      _lon = lon;
+      _var = acc * acc;
+      _t = time;
+      return (lat: lat, lon: lon);
+    }
+    final dt = time.difference(_t!).inMilliseconds / 1000.0;
+    if (dt > 0) {
+      _var += dt * q * q;
+      _t = time;
+    }
+    final k = _var / (_var + acc * acc);
+    _lat = _lat! + k * (lat - _lat!);
+    _lon = _lon! + k * (lon - _lon!);
+    _var = (1 - k) * _var;
+    return (lat: _lat!, lon: _lon!);
   }
 }
 
