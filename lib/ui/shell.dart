@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/format.dart';
+import '../core/theme.dart';
 import '../domain/models.dart';
 import '../services/recorder.dart';
 import '../state/app_state.dart';
@@ -84,7 +85,6 @@ class HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final rec = context.watch<Recorder>();
     final pages = [
       const HomeScreen(),
@@ -97,49 +97,127 @@ class HomeShellState extends State<HomeShell> {
       body: IndexedStack(index: index, children: pages),
       floatingActionButton: rec.isActive && index != 2
           ? FloatingActionButton.extended(
+              backgroundColor: PaceColors.ink,
+              foregroundColor: Colors.white,
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveRunScreen())),
               icon: const Icon(Icons.directions_run),
               label: Text('Corrida em andamento · ${Fmt.kmUnit(rec.distance)}'),
             )
           : null,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: go,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Início'),
-          const NavigationDestination(
-              icon: Icon(Icons.format_list_bulleted), selectedIcon: Icon(Icons.list_alt), label: 'Histórico'),
-          NavigationDestination(
-            icon: _RunIcon(color: cs.primary, active: false),
-            selectedIcon: _RunIcon(color: cs.primary, active: true),
-            label: 'Correr',
-          ),
-          const NavigationDestination(
-              icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Evolução'),
-          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
-        ],
-      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      extendBody: true,
+      bottomNavigationBar: PaceNavBar(index: index, onSelect: go),
     );
   }
 }
 
-class _RunIcon extends StatelessWidget {
-  final Color color;
-  final bool active;
-  const _RunIcon({required this.color, required this.active});
+/// Barra inferior flutuante, com o botão "Correr" em destaque no centro.
+class PaceNavBar extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onSelect;
+  const PaceNavBar({super.key, required this.index, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 48,
-      height: 34,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(17),
-        boxShadow: active ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 10)] : null,
+    final p = Pal.of(context);
+    Widget item(int i, IconData icon, IconData sel, String label) {
+      final on = index == i;
+      final c = on ? p.mintText : p.muted;
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: on,
+          label: label,
+          child: InkWell(
+            key: ValueKey('nav-$i'),
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => onSelect(i),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    scale: on ? 1.1 : 1,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(on ? sel : icon, color: c, size: 23),
+                  ),
+                  const SizedBox(height: 3),
+                  ExcludeSemantics(
+                    child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: SizedBox(
+          height: 86,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              Container(
+                height: 68,
+                decoration: BoxDecoration(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: p.dark ? PaceColors.lineDark : const Color(0xFFE9EDF2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: p.dark ? Colors.black.withValues(alpha: 0.4) : const Color(0x1A0F172A),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    item(0, Icons.home_outlined, Icons.home_rounded, 'Início'),
+                    item(1, Icons.format_list_bulleted_rounded, Icons.view_list_rounded, 'Histórico'),
+                    const Expanded(child: SizedBox()),
+                    item(3, Icons.insights_outlined, Icons.insights_rounded, 'Evolução'),
+                    item(4, Icons.person_outline_rounded, Icons.person_rounded, 'Perfil'),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: 0,
+                child: Semantics(
+                  button: true,
+                  label: 'Correr',
+                  child: GestureDetector(
+                    key: const ValueKey('nav-2'),
+                    onTap: () => onSelect(2),
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: p.mint,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: p.bg, width: 5),
+                        boxShadow: [BoxShadow(color: p.mint.withValues(alpha: 0.45), blurRadius: 20, offset: const Offset(0, 8))],
+                      ),
+                      child: Icon(
+                        index == 2 ? Icons.directions_run_rounded : Icons.play_arrow_rounded,
+                        color: p.dark ? PaceColors.bgDark : Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: const Icon(Icons.directions_run, color: Colors.white, size: 22),
     );
   }
 }

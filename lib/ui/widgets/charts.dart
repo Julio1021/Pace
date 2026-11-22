@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
 /// Gráfico de barras de quilometragem (um rótulo por barra). Toque mostra o valor.
 class KmBarChart extends StatelessWidget {
   final List<({String label, double km})> data;
@@ -20,7 +22,8 @@ class KmBarChart extends StatelessWidget {
     // Escala com 4 divisões "redondas" (ex.: 0, 5, 10, 15, 20).
     final step = maxKm <= 0 ? 1.25 : _niceCeil(maxKm * 1.1 / 4);
     final top = step * 4;
-    final barW = data.length > 20 ? 6.0 : (data.length > 10 ? 10.0 : 18.0);
+    final barW = data.length > 20 ? 7.0 : (data.length > 10 ? 12.0 : 24.0);
+    final pal = Pal.of(context);
     return SizedBox(
       height: height,
       child: BarChart(
@@ -33,7 +36,7 @@ class KmBarChart extends StatelessWidget {
             show: true,
             drawVerticalLine: false,
             horizontalInterval: top / 4,
-            getDrawingHorizontalLine: (_) => FlLine(color: muted.withValues(alpha: 0.15), strokeWidth: 1),
+            getDrawingHorizontalLine: (_) => FlLine(color: muted.withValues(alpha: 0.12), strokeWidth: 1, dashArray: [4, 4]),
           ),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -82,13 +85,8 @@ class KmBarChart extends StatelessWidget {
                   BarChartRodData(
                     toY: data[i].km,
                     width: barW,
-                    color: i == highlightIndex ? cs.secondary : cs.primary,
-                    borderRadius: BorderRadius.circular(barW / 2.5),
-                    backDrawRodData: BackgroundBarChartRodData(
-                      show: true,
-                      toY: top,
-                      color: muted.withValues(alpha: 0.06),
-                    ),
+                    color: (highlightIndex == null || i == highlightIndex) ? pal.mint : pal.mintMid,
+                    borderRadius: BorderRadius.circular(barW / 2.4),
                   ),
                 ],
               ),

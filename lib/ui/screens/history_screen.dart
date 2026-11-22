@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/format.dart';
+import '../../core/theme.dart';
 import '../../domain/models.dart';
 import '../../domain/stats.dart';
 import '../../state/app_state.dart';
@@ -150,12 +151,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    child: PaceCard(
-                      child: StatGrid(columns: 3, children: [
-                        StatTile(label: 'Corridas', value: Fmt.integer(total.count)),
-                        StatTile(label: 'Distância', value: Fmt.integer(total.distanceM / 1000), unit: 'km'),
-                        StatTile(label: 'Tempo', value: Fmt.durationLong(total.movingSec)),
-                      ]),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [PaceColors.mint, PaceColors.mintDark],
+                        ),
+                        boxShadow: [BoxShadow(color: PaceColors.mint.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
+                      ),
+                      child: Row(
+                        children: [
+                          for (final e in [
+                            (Fmt.integer(total.count), total.count == 1 ? 'corrida' : 'corridas'),
+                            (Fmt.integer(total.distanceM / 1000), 'km'),
+                            (Fmt.durationLong(total.movingSec), 'tempo'),
+                          ])
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: numStyle(24, color: Colors.white))),
+                                  Text(e.$2, style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -177,7 +201,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
                         child: Row(
                           children: [
-                            Expanded(child: Text(Fmt.monthYear(r), style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+                            Expanded(child: Text(Fmt.monthYear(r), style: numStyle(18, color: cs.onSurface))),
                             Text('${Fmt.kmUnit(s.distanceM, decimals: 1)} · ${s.count} '
                                 '${s.count == 1 ? 'corrida' : 'corridas'}',
                                 style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
@@ -195,7 +219,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     );
                   },
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 96)),
+                const SliverToBoxAdapter(child: SizedBox(height: 130)),
               ],
             ),
     );

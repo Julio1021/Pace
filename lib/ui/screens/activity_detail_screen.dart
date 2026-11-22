@@ -211,10 +211,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: PaceCard(
-                color: cs.secondary.withValues(alpha: 0.15),
+                color: Pal.of(context).mintSoft,
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: cs.secondary),
+                    Icon(Icons.check_circle_rounded, color: Pal.of(context).mintText),
                     const SizedBox(width: 10),
                     const Expanded(child: Text('Muito bem! Sua corrida foi salva no histórico.')),
                   ],
@@ -224,12 +224,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           Text('${Fmt.weekdayDate(a.start)} · ${Fmt.time(a.start)}',
               style: t.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 4),
-          Text(Fmt.kmUnit(a.distanceM), style: t.displaySmall?.copyWith(fontWeight: FontWeight.w900)),
+          Text(Fmt.kmUnit(a.distanceM), style: numStyle(46, color: cs.onSurface)),
           const SizedBox(height: 12),
           if (route.length >= 2)
             ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: SizedBox(height: 240, child: RouteMap(points: route)),
+              borderRadius: BorderRadius.circular(24),
+              child: SizedBox(height: 300, child: RouteMap(points: route)),
             ),
           if (a.gpsPartial) ...[
             const SizedBox(height: 10),
@@ -246,11 +246,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           const SizedBox(height: 12),
           PaceCard(
             child: StatGrid(columns: 3, spacing: 18, children: [
-              StatTile(label: 'Tempo', value: Fmt.duration(a.movingSec)),
-              StatTile(label: 'Pace médio', value: Fmt.pace(a.paceSecPerKm), unit: '/km'),
+              StatTile(label: 'Tempo', value: Fmt.duration(a.movingSec), color: Pal.of(context).violet),
+              StatTile(label: 'Pace médio', value: Fmt.pace(a.paceSecPerKm), unit: '/km', color: Pal.of(context).orange),
               StatTile(label: 'Velocidade', value: Fmt.speed(a.avgSpeed), unit: 'km/h'),
               StatTile(label: 'Melhor km', value: best == null ? '—' : Fmt.duration(best)),
-              StatTile(label: 'Calorias (estim.)', value: a.calories == null ? '—' : Fmt.integer(a.calories!), unit: 'kcal'),
+              StatTile(label: 'Calorias (estim.)', value: a.calories == null ? '—' : Fmt.integer(a.calories!), unit: 'kcal', color: Pal.of(context).pink),
               StatTile(label: 'Elevação', value: '+${Fmt.integer(a.elevGain)}', unit: 'm'),
               if (a.elapsedSec > a.movingSec + 30) StatTile(label: 'Tempo total', value: Fmt.duration(a.elapsedSec)),
               if (a.avgHr != null) StatTile(label: 'FC média', value: '${a.avgHr}', unit: 'bpm'),
@@ -269,7 +269,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               padding: const EdgeInsets.fromLTRB(4, 16, 16, 8),
               child: DistanceLineChart(
                 data: [for (final p in paceData) (x: p.km, y: p.pace)],
-                color: cs.primary,
+                color: Pal.of(context).orange,
                 formatY: Fmt.pace,
                 invert: true,
               ),
@@ -423,7 +423,7 @@ class _SplitsTable extends StatelessWidget {
                         Text(Fmt.pace(pace),
                             style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: isFastest ? cs.secondary : null,
+                                color: isFastest ? Pal.of(context).mintText : null,
                                 fontFeatures: const [FontFeature.tabularFigures()])),
                         const SizedBox(width: 8),
                         Expanded(
@@ -433,7 +433,7 @@ class _SplitsTable extends StatelessWidget {
                             child: Container(
                               height: 8,
                               decoration: BoxDecoration(
-                                color: (isFastest ? cs.secondary : cs.primary).withValues(alpha: 0.75),
+                                color: isFastest ? Pal.of(context).mint : Pal.of(context).mintMid,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -452,7 +452,7 @@ class _SplitsTable extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: diff == null || diff.abs() < 1
                             ? cs.onSurfaceVariant
-                            : (diff < 0 ? cs.secondary : PaceColors.red),
+                            : (diff < 0 ? Pal.of(context).mintText : const Color(0xFFDC2626)),
                       ),
                     ),
                   ),

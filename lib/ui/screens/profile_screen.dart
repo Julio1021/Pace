@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/format.dart';
+import '../../core/theme.dart';
 import '../../data/exporters.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
@@ -83,34 +84,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Perfil')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 130),
         children: [
-          PaceCard(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: cs.primary,
-                  child: Text(p.initials,
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(p.name, style: t.titleLarge),
-                      const SizedBox(height: 2),
-                      Text(details.join(' · '), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                      const SizedBox(height: 2),
-                      Text('Meta semanal: ${Fmt.integer(p.weeklyGoalKm)} km',
-                          style: t.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600)),
-                    ],
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(26),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
+              child: Ink(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [PaceColors.mint, PaceColors.mintDark],
                   ),
+                  boxShadow: [BoxShadow(color: PaceColors.mint.withValues(alpha: 0.3), blurRadius: 22, offset: const Offset(0, 10))],
                 ),
-                const Icon(Icons.edit_outlined),
-              ],
+                child: Row(
+                  children: [
+                    Container(
+                      width: 68,
+                      height: 68,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22)),
+                      child: Text(p.initials, style: numStyle(26, color: PaceColors.mintDark)),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(p.name, style: numStyle(22, color: Colors.white)),
+                          const SizedBox(height: 2),
+                          Text(details.join(' · '),
+                              style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.9))),
+                          const SizedBox(height: 2),
+                          Text('Meta semanal: ${Fmt.integer(p.weeklyGoalKm)} km',
+                              style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.edit_outlined, color: Colors.white),
+                  ],
+                ),
+              ),
             ),
           ),
           if (p.weightKg == null) ...[

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/format.dart';
+import '../../core/theme.dart';
 import '../../domain/stats.dart';
 import '../../state/app_state.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
+import '../widgets/pace_ui.dart';
 
 enum EvoPeriod { d7, d30, d90, m12, all }
 
@@ -84,7 +86,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
               ),
             )
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 130),
               children: [
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -115,8 +117,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                           if (prev != null) ChangeBadge(ratio: Periods.change(cur.distanceM, prev.distanceM)),
                         ],
                       ),
-                      Text('${Fmt.km(cur.distanceM, decimals: 1)} km',
-                          style: t.headlineLarge?.copyWith(fontWeight: FontWeight.w900, color: cs.primary)),
+                      Text('${Fmt.km(cur.distanceM, decimals: 1)} km', style: numStyle(40, color: cs.onSurface)),
                       if (prev != null)
                         Text(
                           'Período anterior equivalente: ${Fmt.kmUnit(prev.distanceM, decimals: 1)}',
@@ -134,6 +135,33 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                           },
                           style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SectionTitle('Seu ano em corridas'),
+                PaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      YearMosaic(kmByDay: _kmByDay(app), today: now, weeks: 26),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('Últimos 6 meses · cada quadrado é um dia',
+                                style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          ),
+                          Text('menos ', style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                          for (final c in [Pal.of(context).faint, Pal.of(context).mintMid, PaceColors.mint])
+                            Container(
+                              width: 10,
+                              height: 10,
+                              margin: const EdgeInsets.only(left: 3),
+                              decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(3)),
+                            ),
+                          Text(' mais', style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        ],
                       ),
                     ],
                   ),
@@ -177,6 +205,16 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
               ],
             ),
     );
+  }
+
+  static Map<DateTime, double> _kmByDay(AppState app) {
+    final m = <DateTime, double>{};
+    for (final a in app.activities) {
+      final l = a.start.toLocal();
+      final d = DateTime(l.year, l.month, l.day);
+      m[d] = (m[d] ?? 0) + a.distanceM / 1000;
+    }
+    return m;
   }
 
   static double? _ch(num cur, num? prev) => prev == null ? null : Periods.change(cur.toDouble(), prev.toDouble());

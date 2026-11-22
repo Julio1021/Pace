@@ -68,7 +68,6 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
   Widget build(BuildContext context) {
     final rec = context.watch<Recorder>();
     final cs = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final paused = rec.manuallyPaused || rec.autoPaused;
 
     if (!rec.isActive && !_finishing) {
@@ -89,10 +88,12 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
       });
     }
 
-    return PopScope(
+    return Theme(
+      data: buildTheme(Brightness.dark),
+      child: Builder(builder: (context) => PopScope(
       canPop: !_locked,
       child: Scaffold(
-        backgroundColor: dark ? PaceColors.bgDark : PaceColors.bgLight,
+        backgroundColor: PaceColors.bgDark,
         body: SafeArea(
           child: Column(
             children: [
@@ -177,6 +178,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
           ),
         ),
       ),
+    )),
     );
   }
 }
@@ -188,7 +190,6 @@ class _Numbers extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    const tab = [FontFeature.tabularFigures()];
     final goal = rec.goalProgress;
     return LayoutBuilder(builder: (context, c) {
       final big = (c.maxHeight * 0.2).clamp(56.0, 110.0);
@@ -197,22 +198,27 @@ class _Numbers extends StatelessWidget {
         children: [
           Column(
             children: [
+              Text('DISTÂNCIA', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: cs.onSurfaceVariant)),
               FittedBox(
-                child: Text(Fmt.duration(rec.moving),
-                    style: TextStyle(fontSize: big * 0.75, fontWeight: FontWeight.w800, fontFeatures: tab)),
+                child: Text(Fmt.km(rec.distance), style: numStyle(big * 1.15, color: Colors.white, height: 1.05)),
               ),
-              Text('Tempo em movimento', style: TextStyle(color: cs.onSurfaceVariant)),
+              Text('quilômetros', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
             ],
           ),
-          Column(
-            children: [
-              FittedBox(
-                child: Text(Fmt.km(rec.distance),
-                    style: TextStyle(fontSize: big, fontWeight: FontWeight.w900, color: cs.primary, height: 1, fontFeatures: tab)),
-              ),
-              const SizedBox(height: 10),
-              Text('Quilômetros', style: TextStyle(color: cs.onSurfaceVariant)),
-            ],
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: PaceColors.cardDark,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: PaceColors.lineDark),
+            ),
+            child: Column(
+              children: [
+                Text('Tempo em movimento', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+                FittedBox(child: Text(Fmt.duration(rec.moving), style: numStyle(big * 0.62, color: const Color(0xFFA48BFF)))),
+              ],
+            ),
           ),
           if (goal != null)
             Padding(
@@ -354,11 +360,11 @@ class _Controls extends StatelessWidget {
                 width: 92,
                 height: 92,
                 decoration: BoxDecoration(
-                  color: paused ? cs.secondary : PaceColors.orange,
+                  color: paused ? PaceColors.mintBright : const Color(0xFFFF9D5C),
                   shape: BoxShape.circle,
                   boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))],
                 ),
-                child: Icon(paused ? Icons.play_arrow : Icons.pause, size: 48, color: Colors.white),
+                child: Icon(paused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 48, color: PaceColors.bgDark),
               ),
             ),
             if (paused)

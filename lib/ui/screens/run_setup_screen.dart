@@ -5,11 +5,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:provider/provider.dart';
 
+import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../domain/calc.dart';
 import '../../domain/models.dart';
 import '../../services/recorder.dart';
 import '../widgets/common.dart';
+import '../widgets/pace_ui.dart';
 import 'live_run_screen.dart';
 
 /// Preparação da corrida: permissões, sinal de GPS e opções.
@@ -246,13 +248,69 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     final quality = GpsFilter.quality(_accuracy);
     final qColor = _accuracy == null
         ? cs.onSurfaceVariant
-        : (_accuracy! <= 8 ? cs.secondary : (_accuracy! <= 20 ? PaceColors.blue : PaceColors.orange));
+        : (_accuracy! <= 8 ? Pal.of(context).mintText : (_accuracy! <= 20 ? PaceColors.mintDark : PaceColors.orange));
 
+    final pal = Pal.of(context);
+    final now = DateTime.now();
+    final phase = SkyBackground.phase(now, pal.dark);
+    final onSky = phase.night ? Colors.white : PaceColors.ink;
     return Scaffold(
-      appBar: AppBar(title: const Text('Correr')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      body: Stack(
         children: [
+          SkyBackground(now: now, height: 560),
+          SafeArea(
+            bottom: false,
+            child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 130),
+        children: [
+          Appear(
+            child: Row(
+              children: [
+                Expanded(child: Text('Correr', style: numStyle(28, color: onSky))),
+                if (_hasPermission && _serviceOn)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(color: pal.card.withValues(alpha: 0.88), borderRadius: BorderRadius.circular(999)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _Blink(color: qColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          _accuracy == null ? 'Procurando GPS…' : 'GPS ${quality.toLowerCase()} · ${_accuracy!.round()} m',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: qColor),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Appear(
+            delayMs: 60,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${Fmt.weekdayDate(now.toUtc()).split(',').first} · ${phase.label}',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSky.withValues(alpha: 0.75))),
+                const SizedBox(height: 2),
+                SizedBox(
+                  width: 270,
+                  child: Text(phase.night ? 'Corrida noturna? Use roupa refletiva.' : 'Bom momento para sair',
+                      style: numStyle(30, color: onSky, height: 1.1)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 34),
+          Appear(
+            delayMs: 120,
+            child: Center(
+              child: _StartButton(onTap: _starting ? null : () => _start()),
+            ),
+          ),
+          const SizedBox(height: 34),
           if (!_hasPermission)
             _Banner(
               icon: Icons.location_off,
@@ -271,29 +329,6 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 await Geolocator.openLocationSettings();
               },
             )
-          else
-            PaceCard(
-              child: Row(
-                children: [
-                  Icon(Icons.gps_fixed, color: qColor),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Sinal de GPS: $quality', style: t.titleSmall?.copyWith(color: qColor)),
-                        Text(
-                          _accuracy == null
-                              ? 'Fique ao ar livre por alguns segundos.'
-                              : 'Precisão de ${_accuracy!.round()} m',
-                          style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
           if (_batteryOk == false) ...[
             const SizedBox(height: 10),
             _Banner(
@@ -393,23 +428,124 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 64,
-            child: FilledButton.icon(
-              onPressed: _starting ? null : () => _start(),
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-                textStyle: t.titleLarge?.copyWith(fontSize: 20, fontWeight: FontWeight.w800),
-              ),
-              icon: const Icon(Icons.play_arrow, size: 30),
-              label: const Text('Iniciar corrida'),
-            ),
+        ],
+      ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Botão grande de iniciar, com pulso suave.
+class _StartButton extends StatefulWidget {
+  final VoidCallback? onTap;
+  const _StartButton({required this.onTap});
+
+  @override
+  State<_StartButton> createState() => _StartButtonState();
+}
+
+class _StartButtonState extends State<_StartButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (motionOn(context)) {
+      if (!_c.isAnimating) _c.repeat();
+    } else {
+      _c.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Pal.of(context);
+    return Semantics(
+      button: true,
+      label: 'Iniciar corrida',
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, child) {
+            final t = _c.value;
+            return SizedBox(
+              width: 230,
+              height: 230,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 176 + 54 * t,
+                    height: 176 + 54 * t,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.mint.withValues(alpha: 0.35 * (1 - t))),
+                  ),
+                  child!,
+                ],
+              ),
+            );
+          },
+          child: Container(
+            width: 176,
+            height: 176,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: p.mint,
+              boxShadow: [BoxShadow(color: p.mint.withValues(alpha: 0.45), blurRadius: 36, offset: const Offset(0, 16))],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.play_arrow_rounded, size: 54, color: p.dark ? PaceColors.bgDark : Colors.white),
+                Text('INICIAR',
+                    style: numStyle(20, color: p.dark ? PaceColors.bgDark : Colors.white).copyWith(letterSpacing: 1)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ponto piscando (sinal de GPS).
+class _Blink extends StatefulWidget {
+  final Color color;
+  const _Blink({required this.color});
+
+  @override
+  State<_Blink> createState() => _BlinkState();
+}
+
+class _BlinkState extends State<_Blink> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1600), lowerBound: 0.35, upperBound: 1);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (motionOn(context) && !_c.isAnimating) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _c,
+        child: Container(width: 8, height: 8, decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle)),
+      );
 }
 
 class _Stepper extends StatelessWidget {

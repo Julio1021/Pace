@@ -124,6 +124,11 @@ Widget _wrap(_Env env, Widget home, {ThemeMode mode = ThemeMode.light}) => Multi
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        // Prints sem animação (mostra o estado final de cada efeito).
+        builder: (c, child) => MediaQuery(
+          data: MediaQuery.of(c).copyWith(disableAnimations: true),
+          child: child!,
+        ),
         home: home,
       ),
     );
@@ -136,7 +141,8 @@ Future<void> _shot(WidgetTester tester, String name, {double height = 844}) asyn
 }
 
 Future<void> _tab(WidgetTester tester, String label) async {
-  await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text(label)));
+  const idx = {'Início': 0, 'Histórico': 1, 'Correr': 2, 'Evolução': 3, 'Perfil': 4};
+  await tester.tap(find.byKey(ValueKey('nav-${idx[label]}')));
   await _settle(tester);
 }
 
@@ -227,6 +233,14 @@ void main() {
     rec.points.addAll(b.points.where((p) => p.dist <= 4237));
     await tester.pumpWidget(_wrap(env, const LiveRunScreen()));
     await _shot(tester, '10-corrida');
+  }, skip: !_enabled);
+
+  testWidgets('12 correr escuro', (tester) async {
+    final env = await _makeEnv(tester);
+    await tester.pumpWidget(_wrap(env, const HomeShell(), mode: ThemeMode.dark));
+    await _settle(tester);
+    await _tab(tester, 'Correr');
+    await _shot(tester, '12-correr-escuro', height: 1000);
   }, skip: !_enabled);
 
   testWidgets('11 importar', (tester) async {

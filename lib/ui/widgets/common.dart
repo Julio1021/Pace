@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme.dart';
+
 /// Cartão padrão com cantos arredondados e espaçamento interno.
 class PaceCard extends StatelessWidget {
   final Widget child;
@@ -11,12 +13,16 @@ class PaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: color,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: padding, child: child),
+    final p = Pal.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), boxShadow: p.shadow),
+      child: Card(
+        color: color,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
   }
@@ -59,11 +65,7 @@ class StatTile extends StatelessWidget {
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: (large ? t.headlineMedium : t.titleLarge)?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: numStyle(large ? 30 : 22, color: color ?? Theme.of(context).colorScheme.onSurface),
               ),
             ),
             if (unit != null) ...[
@@ -130,7 +132,7 @@ class SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
       child: Row(
         children: [
-          Expanded(child: Text(text, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+          Expanded(child: Text(text, style: numStyle(18, color: Theme.of(context).colorScheme.onSurface))),
           if (trailing != null) trailing!,
         ],
       ),
@@ -193,7 +195,7 @@ class ChangeBadge extends StatelessWidget {
     final good = higherIsBetter ? v > 0 : v < 0;
     final neutral = v == 0;
     final cs = Theme.of(context).colorScheme;
-    final color = neutral ? cs.onSurfaceVariant : (good ? cs.secondary : const Color(0xFFE5484D));
+    final color = neutral ? cs.onSurfaceVariant : (good ? Pal.of(context).mintText : const Color(0xFFDC2626));
     final icon = neutral ? Icons.remove : (v > 0 ? Icons.arrow_upward : Icons.arrow_downward);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
