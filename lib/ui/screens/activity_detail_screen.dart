@@ -298,8 +298,20 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ]),
           ),
           if (b.splits.isNotEmpty) ...[
-            const SectionTitle('Parciais por km'),
-            PaceCard(padding: const EdgeInsets.symmetric(vertical: 8), child: _SplitsTable(splits: b.splits, bike: bike)),
+            // No pedal longo, parciais a cada 5 km (a lista por km fica enorme).
+            Builder(builder: (context) {
+              final chunk = bike && a.distanceM >= 10000 ? 5 : 1;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SectionTitle(chunk == 1 ? 'Parciais por km' : 'Parciais a cada $chunk km'),
+                  PaceCard(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: _SplitsTable(splits: _group(b.splits, chunk), bike: bike, chunkM: chunk * 1000.0),
+                  ),
+                ],
+              );
+            }),
           ],
           if (paceData.length >= 5 && bike) ...[
             const SectionTitle('Velocidade ao longo do pedal'),
@@ -425,13 +437,14 @@ class _Notice extends StatelessWidget {
 class _SplitsTable extends StatelessWidget {
   final List<Split> splits;
   final bool bike;
-  const _SplitsTable({required this.splits, this.bike = false});
+  final double chunkM;
+  const _SplitsTable({required this.splits, this.bike = false, this.chunkM = 1000});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
-    final full = splits.where((s) => s.distM >= 999).map((s) => s.paceSecPerKm).toList();
+    final full = splits.where((s) => s.distM >= chunkM - 1).map((s) => s.paceSecPerKm).toList();
     final fastest = full.isEmpty ? 0.0 : full.reduce((a, b) => a < b ? a : b);
     final slowest = full.isEmpty ? 1.0 : full.reduce((a, b) => a > b ? a : b);
     Widget header(String s, {TextAlign align = TextAlign.left}) =>
@@ -455,14 +468,14 @@ class _SplitsTable extends StatelessWidget {
             final frac = (1 - (pace - fastest) / range).clamp(0.15, 1.0);
             final prev = i > 0 ? splits[i - 1].paceSecPerKm : null;
             final diff = prev == null ? null : pace - prev;
-            final isFastest = s.distM >= 999 && (pace - fastest).abs() < 0.5;
+            final isFastest = s.distM >= chunkM - 1 && (pace - fastest).abs() < 0.5;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
               child: Row(
                 children: [
                   SizedBox(
                     width: 44,
-                    child: Text(s.distM >= 999 ? '${s.km}' : Fmt.km(s.distM),
+                    child: Text(s.distM >= chunkM - 1 ? '${s.km}' : Fmt.km(s.distM),
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                   ),
                   Expanded(
@@ -752,4 +765,23 @@ class _Hero extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Junta parciais de 1 km em blocos de [km] km (o último pode ser menor).
+List<Split> _group(List<Split> splits, int km) {
+  if (km <= 1) return splits;
+  final out = <Split>[];
+  var dist = 0.0, sec = 0.0, total = 0.0;
+  for (final s in splits) {
+    dist += s.distM;
+    sec += s.sec;
+    total += s.distM;
+    if (dist >= km * 1000 - 1) {
+      out.add(Split(km: (total / 1000).round(), distM: dist, sec: sec));
+      dist = 0;
+      sec = 0;
+    }
+  }
+  if (dist >= 10) out.add(Split(km: (total / 1000).ceil(), distM: dist, sec: sec));
+  return out;
 }

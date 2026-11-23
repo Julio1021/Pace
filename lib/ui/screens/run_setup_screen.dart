@@ -490,7 +490,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 const SizedBox(height: 2),
                 SizedBox(
                   width: 270,
-                  child: Text(sky.phrase, style: numStyle(30, color: onSky, height: 1.1)),
+                  child: Text(sportPhrase(sky.phrase, app.sport), style: numStyle(30, color: onSky, height: 1.1)),
                 ),
               ],
             ),
@@ -1302,6 +1302,21 @@ class _Banner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Adapta a frase do céu para o pedal ("correr" vira "pedalar").
+String sportPhrase(String s, Sport sport) {
+  if (sport == Sport.run) return s;
+  const map = {
+    'Corrida noturna?': 'Pedal noturno?',
+    'Corra com': 'Pedale com',
+    'correndo': 'pedalando',
+    'correr': 'pedalar',
+    'Use roupa refletiva.': 'Use luz e refletivo.',
+  };
+  var out = s;
+  map.forEach((k, v) => out = out.replaceAll(k, v));
+  return out;
 }
 
 /// Seletor Corrida | Pedal (vidro sobre o céu).
