@@ -782,9 +782,11 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           Appear(
             delayMs: 120,
             child: Center(
+              // Largura extra dos dois lados para a engrenagem caber (e receber o toque).
               child: Stack(
-                clipBehavior: Clip.none,
+                alignment: Alignment.center,
                 children: [
+                  const SizedBox(width: 290, height: 176),
                   Builder(builder: (context) {
                 if (app.sport == Sport.bike) {
                   final wk = PeriodStats.of(Periods.between(app.rides, Periods.weekStart(now), now.add(const Duration(days: 1)))).distanceM;
@@ -804,7 +806,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               }),
                   // Engrenagem: abre treino e ajustes.
                   Positioned(
-                    right: -44,
+                    right: 0,
                     bottom: 26,
                     child: IconButton(
                       key: const ValueKey('run-settings'),
