@@ -1,0 +1,17 @@
+name: Limpar amostras de voz
+on:
+  push:
+    paths: ['.github/workflows/limpeza.yml']
+permissions:
+  contents: write
+jobs:
+  limpar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove as amostras antigas (mantém o pacote da Francisca)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in francisca-1-normal.mp3 francisca-2-animada.mp3 thalitamultilingual-1-normal.mp3 thalitamultilingual-2-animada.mp3; do
+            gh release delete-asset vozes "$f" -y -R "$GITHUB_REPOSITORY" || true
+          done
