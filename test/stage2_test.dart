@@ -143,7 +143,7 @@ void main() {
       );
       final rem = notes.where((n) => n.id < 200).toList();
       expect(rem.first.at, DateTime(2026, 11, 26, 18));
-      expect(rem.length, 4);
+      expect(rem.length, 3); // 26/11, 1/12 e 3/12 (14 dias à frente)
       final nudge = notes.where((n) => n.id >= 200 && n.id < 300).toList();
       expect(nudge.length, 2);
       expect(nudge.first.text, contains('3,0 km'));
