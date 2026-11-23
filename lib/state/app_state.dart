@@ -7,6 +7,7 @@ import '../data/database.dart';
 import '../domain/achievements.dart';
 import '../domain/coach.dart';
 import '../domain/goals.dart';
+import '../domain/intro_messages.dart';
 import '../domain/models.dart';
 import '../domain/plans.dart';
 import '../domain/records.dart';
@@ -25,6 +26,23 @@ class RunPreset {
   final double value;
   final String label;
   const RunPreset({required this.sessionIndex, required this.type, required this.byTime, required this.value, required this.label});
+}
+
+enum IntroMode { always, daily, off }
+
+extension IntroModeX on IntroMode {
+  String get key => switch (this) { IntroMode.always => 'sempre', IntroMode.daily => 'dia', IntroMode.off => 'off' };
+  String get label => switch (this) {
+        IntroMode.always => 'Sempre que abrir',
+        IntroMode.daily => 'Uma vez por dia',
+        IntroMode.off => 'Desligada',
+      };
+  static IntroMode parse(String? s, {String? legacyEnabled}) => switch (s) {
+        'sempre' => IntroMode.always,
+        'dia' => IntroMode.daily,
+        'off' => IntroMode.off,
+        _ => legacyEnabled == '0' ? IntroMode.off : IntroMode.always,
+      };
 }
 
 /// Estado global: perfil e lista de corridas concluídas (mais recentes primeiro).
@@ -70,8 +88,10 @@ class AppState extends ChangeNotifier {
   bool ready = false;
   String? error;
 
-  /// Animação de abertura com o Guará (uma vez por dia).
-  bool introEnabled = true;
+  /// Abertura com o Guará: sempre que abrir, uma vez por dia ou desligada.
+  IntroMode introMode = IntroMode.always;
+  bool get introEnabled => introMode != IntroMode.off;
+  List<String> _introRecent = [];
 
   /// Estilo das mensagens durante a corrida.
   CoachStyle coachStyle = CoachStyle.energetic;
@@ -294,7 +314,10 @@ class AppState extends ChangeNotifier {
       _setAll(await db.listActivities());
       sport = SportX.parse(await db.getKv('sport'));
       bikeVoiceEveryKm = int.tryParse(await db.getKv('bike_voice_every_km') ?? '') ?? 5;
-      introEnabled = (await db.getKv('intro_enabled')) != '0';
+      introMode = IntroModeX.parse(await db.getKv('intro_mode'), legacyEnabled: await db.getKv('intro_enabled'));
+      try {
+        _introRecent = ((jsonDecode(await db.getKv('intro_recent') ?? '[]') as List).cast<String>());
+      } catch (_) {}
       coachStyle = CoachStyleX.parse(await db.getKv('coach_style'));
       voiceEveryKm = int.tryParse(await db.getKv('voice_every_km') ?? '') ?? 1;
       await _loadExtras();
@@ -302,7 +325,7 @@ class AppState extends ChangeNotifier {
       final last = await db.getKv('intro_last_day');
       final open = await db.listActivities(status: ActivityStatus.inProgress);
       final today = _dayKey(DateTime.now());
-      showIntroNow = introEnabled && profile.isComplete && open.isEmpty && last != today;
+      showIntroNow = introEnabled && profile.isComplete && open.isEmpty && (introMode == IntroMode.always || last != today);
     } catch (e) {
       error = 'Não foi possível abrir o banco de dados: $e';
     }
@@ -508,10 +531,34 @@ class AppState extends ChangeNotifier {
     await db.setKv('coach_style', s.key);
   }
 
-  Future<void> setIntroEnabled(bool v) async {
-    introEnabled = v;
+  Future<void> setIntroMode(IntroMode m) async {
+    introMode = m;
     notifyListeners();
-    await db.setKv('intro_enabled', v ? '1' : '0');
+    await db.setKv('intro_mode', m.key);
+  }
+
+  /// Volta do segundo plano depois de um tempo: no modo "sempre", o Guará aparece de novo.
+  void appResumed(Duration away, {required bool recording}) {
+    if (introMode != IntroMode.always || recording || !profile.isComplete || showIntroNow) return;
+    if (away < const Duration(minutes: 30)) return;
+    showIntroNow = true;
+    notifyListeners();
+  }
+
+  /// Recado da abertura (sem repetir os últimos mostrados).
+  IntroMessage pickIntro(DateTime now) {
+    final m = IntroMessages.pick(
+      name: profile.name,
+      now: now,
+      runs: activities,
+      rides: rides,
+      weeklyGoalKm: profile.weeklyGoalKm,
+      week: weekStats(now),
+      recent: _introRecent,
+    );
+    _introRecent = [m.text, m.tip, ..._introRecent.where((t) => t != m.text && t != m.tip)].take(16).toList();
+    unawaited(db.setKv('intro_recent', jsonEncode(_introRecent)));
+    return m;
   }
 
   Future<void> reload() async {

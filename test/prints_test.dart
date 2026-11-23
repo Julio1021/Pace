@@ -16,6 +16,7 @@ import 'package:pace/core/theme.dart';
 import 'package:pace/data/import_service.dart';
 import 'package:pace/data/importers.dart';
 import 'package:pace/domain/models.dart';
+import 'package:pace/domain/intro_messages.dart';
 import 'package:pace/services/recorder.dart';
 import 'package:pace/state/app_state.dart';
 import 'package:pace/ui/intro_overlay.dart';
@@ -425,9 +426,38 @@ void main() {
 
   testWidgets('13 abertura', (tester) async {
     final env = await _makeEnv(tester);
-    await tester.pumpWidget(_wrap(env, IntroOverlay(onDone: () {})));
-    await _shot(tester, '13-abertura');
-    await tester.pump(const Duration(seconds: 3));
+    const msgs = [
+      IntroMessage(
+        title: 'Bom dia, Júlio!',
+        text: 'Faltam 8,3 km para a meta da semana. Você consegue!',
+        tip: 'Aqueça de 5 a 10 minutos antes de acelerar.',
+        tipIsAdvice: true,
+        pose: GuaraPoseHint.wave,
+        entrance: IntroEntrance.runIn,
+      ),
+      IntroMessage(
+        title: 'Boa tarde, Júlio!',
+        text: 'Ontem foram 12,00 km de corrida. Mandou bem!',
+        tip: 'O treino mais difícil é o de sair de casa. O resto vem.',
+        tipIsAdvice: false,
+        pose: GuaraPoseHint.celebrate,
+        entrance: IntroEntrance.drop,
+      ),
+      IntroMessage(
+        title: 'Boa noite, Júlio!',
+        text: 'Hora de descansar. Amanhã a gente treina com energia.',
+        tip: 'Dormir bem é parte do treino. É no descanso que o corpo evolui.',
+        tipIsAdvice: true,
+        pose: GuaraPoseHint.sleep,
+        entrance: IntroEntrance.peek,
+      ),
+    ];
+    for (final (i, m) in msgs.indexed) {
+      await tester.pumpWidget(_wrap(env, IntroOverlay(key: ValueKey(i), onDone: () {}, message: m)));
+      await _shot(tester, i == 0 ? '13-abertura' : '13-abertura-${i + 1}');
+    }
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 20));
   }, skip: !_enabled);
 
   testWidgets('11 importar', (tester) async {

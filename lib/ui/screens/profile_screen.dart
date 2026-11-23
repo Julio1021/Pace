@@ -261,12 +261,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: EdgeInsets.zero,
             child: Column(
               children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.auto_awesome_outlined),
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome_outlined),
                   title: const Text('Animação de abertura'),
-                  subtitle: const Text('O Guará dá um recado na primeira abertura do dia'),
-                  value: app.introEnabled,
-                  onChanged: app.setIntroEnabled,
+                  subtitle: const Text('O Guará aparece com um recado e uma dica'),
+                  trailing: DropdownButton<IntroMode>(
+                    value: app.introMode,
+                    underline: const SizedBox(),
+                    borderRadius: BorderRadius.circular(14),
+                    items: [
+                      for (final m in IntroMode.values)
+                        DropdownMenuItem(value: m, child: Text(m == IntroMode.always ? 'Sempre' : m == IntroMode.daily ? '1× por dia' : 'Desligada')),
+                    ],
+                    onChanged: (m) {
+                      if (m != null) app.setIntroMode(m);
+                    },
+                  ),
                 ),
                 const Divider(height: 1),
                 ListTile(

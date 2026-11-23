@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'core/theme.dart';
 import 'ui/widgets/guara_art.dart';
+import 'services/recorder.dart';
 import 'state/app_state.dart';
 import 'ui/intro_overlay.dart';
 import 'ui/screens/profile_edit_screen.dart';
@@ -36,8 +37,40 @@ class PaceApp extends StatelessWidget {
 }
 
 /// Abertura → perfil (primeiro uso) → app.
-class RootGate extends StatelessWidget {
+class RootGate extends StatefulWidget {
   const RootGate({super.key});
+
+  @override
+  State<RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<RootGate> with WidgetsBindingObserver {
+  DateTime? _leftAt;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Voltou ao app depois de um tempo fora: o Guará aparece de novo (modo "sempre").
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _leftAt ??= DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      final left = _leftAt;
+      _leftAt = null;
+      if (left == null) return;
+      context.read<AppState>().appResumed(DateTime.now().difference(left), recording: context.read<Recorder>().isActive);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
