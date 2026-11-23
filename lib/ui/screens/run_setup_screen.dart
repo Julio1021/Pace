@@ -49,6 +49,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   StreamSubscription<Position>? _preview;
   bool _visible = false;
   bool _starting = false;
+  RunPreset? _applied;
   final _scroll = ScrollController();
   final _scrollPos = ValueNotifier<double>(0);
   Timer? _clock;
@@ -227,6 +228,8 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         type: _type,
         coachStyle: context.read<AppState>().coachStyle,
       );
+      context.read<AppState>().clearPreset();
+      _applied = null;
       await rec.start(cfg);
       if (!mounted) return;
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveRunScreen()));
@@ -291,6 +294,19 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
       }
     }
     final sky = SkyInfo.at(now, lat: lat, lon: lon);
+    // Treino escolhido num plano: preenche tipo e meta uma vez.
+    final preset = app.pendingPreset;
+    if (preset != null && !identical(preset, _applied)) {
+      _applied = preset;
+      _type = trainingTypes.contains(preset.type) ? preset.type : trainingTypes.first;
+      if (preset.byTime) {
+        _goal = GoalType.time;
+        _goalMin = preset.value.round();
+      } else {
+        _goal = GoalType.distance;
+        _goalKm = preset.value;
+      }
+    }
     final onSky = sky.onSky;
     final base = Theme.of(context);
     final mq = MediaQuery.of(context);
@@ -401,6 +417,49 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             ),
           ],
           const SectionTitle('Treino'),
+          if (_applied != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: PaceColors.mint.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_note_rounded, color: PaceColors.mintDark),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Treino do plano · ${_applied!.label}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: PaceColors.mintDark)),
+                          Text(
+                            context.read<AppState>().plan?.plan?.sessions[_applied!.sessionIndex].detail ?? '',
+                            style: const TextStyle(fontSize: 13, color: PaceColors.ink, height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Correr sem o plano',
+                      onPressed: () {
+                        context.read<AppState>().clearPreset();
+                        setState(() {
+                          _applied = null;
+                          _goal = GoalType.none;
+                          _type = trainingTypes.first;
+                        });
+                      },
+                      icon: const Icon(Icons.close_rounded, color: PaceColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           PaceCard(
             padding: EdgeInsets.zero,
             child: Column(

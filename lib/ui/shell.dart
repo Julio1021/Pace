@@ -23,11 +23,26 @@ class HomeShell extends StatefulWidget {
   @override
   State<HomeShell> createState() => HomeShellState();
 
-  static HomeShellState? of(BuildContext context) => context.findAncestorStateOfType<HomeShellState>();
+  /// Funciona também a partir de telas abertas por cima (busca a barra ativa).
+  static HomeShellState? of(BuildContext context) =>
+      context.findAncestorStateOfType<HomeShellState>() ?? HomeShellState._current;
 }
 
 class HomeShellState extends State<HomeShell> {
+  static HomeShellState? _current;
   int index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = this;
+  }
+
+  @override
+  void dispose() {
+    if (identical(_current, this)) _current = null;
+    super.dispose();
+  }
   bool _checkedRecovery = false;
 
   void go(int i) => setState(() => index = i);

@@ -12,6 +12,10 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../data/exporters.dart';
 import '../../domain/calc.dart';
+import '../../domain/records.dart';
+import '../widgets/achievement_widgets.dart';
+import 'achievements_screen.dart';
+import 'records_screen.dart';
 import '../../domain/coach.dart';
 import '../../domain/models.dart';
 import '../../state/app_state.dart';
@@ -235,6 +239,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 ),
               ),
             ),
+          _Highlights(activityId: a.id!, fresh: widget.justFinished),
           Text('${Fmt.weekdayDate(a.start)} · ${Fmt.time(a.start)}',
               style: t.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 4),
@@ -543,4 +548,146 @@ class ShareCard extends StatelessWidget {
           ],
         ),
       );
+}
+
+/// Recordes e conquistas desta corrida (com destaque quando acabou de terminar).
+class _Highlights extends StatelessWidget {
+  final int activityId;
+  final bool fresh;
+  const _Highlights({required this.activityId, required this.fresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    if (!app.efforts.containsKey(activityId)) {
+      return fresh && app.effortsBusy
+          ? const Padding(padding: EdgeInsets.only(bottom: 12), child: LinearProgressIndicator(minHeight: 2))
+          : const SizedBox.shrink();
+    }
+    final broken = Records.brokenBy(activityId, app.activities, app.efforts);
+    final brokenKeys = {for (final b in broken) b.now.key};
+    final held = [
+      for (final r in app.records.list)
+        if (r.activityId == activityId && !brokenKeys.contains(r.key)) r
+    ];
+    final medals = [for (final b in app.badges) if (b.activityId == activityId) b];
+    final hasOthers = app.activities.length > 1;
+    final rows = <Widget>[];
+    for (final b in broken) {
+      if (b.before == null && !hasOthers) continue;
+      final r = b.now;
+      final before = b.before;
+      rows.add(_line(
+        context,
+        icon: recordIcon(r),
+        title: before == null ? 'Primeira vez: ${r.label}' : 'Novo recorde: ${r.label}',
+        value: recordValue(r),
+        sub: before == null ? null : 'Antes: ${recordValue(before)} (${recordWhen(before)})',
+        highlight: true,
+      ));
+    }
+    for (final r in held) {
+      rows.add(_line(context, icon: recordIcon(r), title: 'Recorde atual: ${r.label}', value: recordValue(r)));
+    }
+    if (rows.isEmpty && medals.isEmpty) return const SizedBox.shrink();
+    final newRecords = broken.where((b) => b.before != null).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: GlassCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFC53D), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    fresh && newRecords > 0
+                        ? (newRecords == 1 ? 'Você bateu um recorde!' : 'Você bateu $newRecords recordes!')
+                        : 'Destaques desta corrida',
+                    style: numStyle(17, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ...rows,
+            if (rows.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecordsScreen())),
+                  child: const Text('Ver todos os recordes'),
+                ),
+              ),
+            if (medals.isNotEmpty) ...[
+              if (rows.isNotEmpty) const Divider(height: 10),
+              Text(medals.length == 1 ? 'Conquista desbloqueada' : 'Conquistas desbloqueadas',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Pal(true).muted)),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final m in medals)
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+                        child: SizedBox(
+                          width: 84,
+                          child: Column(
+                            children: [
+                              BadgeMedal(badge: m, size: 58),
+                              const SizedBox(height: 4),
+                              Text(m.title,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _line(BuildContext context,
+      {required IconData icon, required String title, required String value, String? sub, bool highlight = false}) {
+    const p = Pal(true);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: (highlight ? const Color(0xFFFFC53D) : PaceColors.mintBright).withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: highlight ? const Color(0xFFFFC53D) : PaceColors.mintBright),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13.5)),
+                if (sub != null) Text(sub, style: TextStyle(fontSize: 12, color: p.muted)),
+              ],
+            ),
+          ),
+          Text(value, style: numStyle(16, color: Colors.white)),
+        ],
+      ),
+    );
+  }
 }

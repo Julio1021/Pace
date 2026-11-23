@@ -16,6 +16,12 @@ class MainActivity : FlutterActivity() {
                     RunNotification.show(applicationContext, (call.arguments as? Map<String, Any?>) ?: emptyMap())
                     result.success(null)
                 }
+                "schedule" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val items = (call.arguments as? List<Map<String, Any?>>) ?: emptyList()
+                    Reminders.schedule(applicationContext, items)
+                    result.success(null)
+                }
                 "status" -> result.success(RunNotification.status(applicationContext))
                 "settings" -> {
                     RunNotification.openSettings(this)

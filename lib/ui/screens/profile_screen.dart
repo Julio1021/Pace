@@ -13,7 +13,12 @@ import '../../domain/coach.dart';
 import '../../state/app_state.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/common.dart';
+import 'achievements_screen.dart';
 import 'import_screen.dart';
+import 'plans_screen.dart';
+import 'records_screen.dart';
+import 'reminders_screen.dart';
+import '../widgets/goals_card.dart';
 import 'voice_picker.dart';
 import 'profile_edit_screen.dart';
 
@@ -166,6 +171,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(width: 8),
                       Text('Primeira corrida: ${Fmt.date(first)}', style: t.bodyMedium),
                     ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SectionTitle('Treino e motivação'),
+          PaceCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final (i, e) in [
+                  (Icons.flag_outlined, 'Metas', 'Semana ${Fmt.integer(app.profile.weeklyGoalKm)} km'
+                      '${app.profile.monthlyGoalKm > 0 ? ' · mês ${Fmt.integer(app.profile.monthlyGoalKm)} km' : ''}'
+                      '${app.profile.yearlyGoalKm > 0 ? ' · ano ${Fmt.integer(app.profile.yearlyGoalKm)} km' : ''}', null),
+                  (Icons.event_note_outlined, 'Planos de treino', app.plan?.plan?.name ?? 'Nenhum plano em andamento', const PlansScreen()),
+                  (Icons.emoji_events_outlined, 'Recordes pessoais', 'Melhores tempos e marcos', const RecordsScreen()),
+                  (Icons.military_tech_outlined, 'Conquistas',
+                      '${app.badges.where((b) => b.unlocked).length} de ${app.badges.length} medalhas', const AchievementsScreen()),
+                  (Icons.notifications_active_outlined, 'Lembretes',
+                      app.reminders.reminder ? 'Ligados' : 'Lembrete para correr desligado', const RemindersScreen()),
+                ].indexed) ...[
+                  if (i > 0) const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(e.$1),
+                    title: Text(e.$2),
+                    subtitle: Text(e.$3),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => e.$4 == null
+                        ? editGoals(context)
+                        : Navigator.push(context, MaterialPageRoute(builder: (_) => e.$4!)),
                   ),
                 ],
               ],

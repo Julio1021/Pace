@@ -101,8 +101,9 @@ Future<_Env> _makeEnv(WidgetTester tester, {bool withData = true, bool withProfi
       }
       await ImportService.run(db, items, weightKg: 74);
     }
-    final app = AppState();
+    final app = AppState()..autoBackground = false;
     await app.init(database: db);
+    await app.afterChange();
     final rec = Recorder(db: () => app.db, weightKg: () => app.profile.weightForCalc);
     env = _Env(app, rec);
   });

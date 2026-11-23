@@ -57,6 +57,13 @@ class RunNotification {
     } catch (_) {}
   }
 
+  /// Agenda os lembretes (substitui os anteriores).
+  static Future<void> schedule(List<Map<String, Object?>> items) async {
+    try {
+      await _ch.invokeMethod('schedule', items);
+    } catch (_) {}
+  }
+
   static Future<void> cancel() async {
     try {
       await _ch.invokeMethod('cancel');

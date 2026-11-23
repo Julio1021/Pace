@@ -10,6 +10,7 @@ import '../shell.dart';
 import '../widgets/activity_tile.dart';
 import '../widgets/common.dart';
 import '../widgets/guara.dart';
+import '../widgets/run_calendar.dart';
 import 'activity_detail_screen.dart';
 import 'import_screen.dart';
 
@@ -27,6 +28,7 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   _Period _period = _Period.all;
   _Dist _dist = _Dist.all;
+  bool _calendar = false;
 
   static const _periodLabels = {
     _Period.all: 'Todo o período',
@@ -96,6 +98,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: const Text('Histórico'),
         actions: [
+          if (app.activities.isNotEmpty)
+            IconButton(
+              tooltip: _calendar ? 'Ver em lista' : 'Ver calendário',
+              icon: Icon(_calendar ? Icons.view_list_rounded : Icons.calendar_month_rounded),
+              onPressed: () => setState(() => _calendar = !_calendar),
+            ),
           IconButton(
             tooltip: 'Importar histórico',
             icon: const Icon(Icons.upload_file),
@@ -126,7 +134,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
             )
-          : CustomScrollView(
+          : _calendar
+              ? ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 130),
+                  children: [RunCalendar(activities: app.activities)],
+                )
+              : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(

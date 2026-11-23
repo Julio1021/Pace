@@ -344,6 +344,10 @@ class UserProfile {
   final String level;
   final double weeklyGoalKm;
 
+  /// Metas do mês e do ano em km (0 = sem meta).
+  final double monthlyGoalKm;
+  final double yearlyGoalKm;
+
   const UserProfile({
     this.name = '',
     this.birthDate,
@@ -352,6 +356,8 @@ class UserProfile {
     this.sex,
     this.level = 'Iniciante',
     this.weeklyGoalKm = 15,
+    this.monthlyGoalKm = 0,
+    this.yearlyGoalKm = 0,
   });
 
   bool get isComplete => name.trim().isNotEmpty;
@@ -383,6 +389,8 @@ class UserProfile {
     String? sex,
     String? level,
     double? weeklyGoalKm,
+    double? monthlyGoalKm,
+    double? yearlyGoalKm,
     bool clearBirth = false,
     bool clearHeight = false,
     bool clearWeight = false,
@@ -396,6 +404,8 @@ class UserProfile {
         sex: clearSex ? null : (sex ?? this.sex),
         level: level ?? this.level,
         weeklyGoalKm: weeklyGoalKm ?? this.weeklyGoalKm,
+        monthlyGoalKm: monthlyGoalKm ?? this.monthlyGoalKm,
+        yearlyGoalKm: yearlyGoalKm ?? this.yearlyGoalKm,
       );
 
   Map<String, Object?> toJson() => {
@@ -406,6 +416,8 @@ class UserProfile {
         'sex': sex,
         'level': level,
         'weeklyGoalKm': weeklyGoalKm,
+        'monthlyGoalKm': monthlyGoalKm,
+        'yearlyGoalKm': yearlyGoalKm,
       };
 
   static UserProfile fromJson(Map<String, Object?> j) => UserProfile(
@@ -416,6 +428,8 @@ class UserProfile {
         sex: j['sex'] as String?,
         level: (j['level'] as String?) ?? 'Iniciante',
         weeklyGoalKm: ((j['weeklyGoalKm'] as num?) ?? 15).toDouble(),
+        monthlyGoalKm: ((j['monthlyGoalKm'] as num?) ?? 0).toDouble(),
+        yearlyGoalKm: ((j['yearlyGoalKm'] as num?) ?? 0).toDouble(),
       );
 }
 

@@ -5,10 +5,15 @@ import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../domain/stats.dart';
 import '../../state/app_state.dart';
+import '../widgets/achievement_widgets.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
+import '../widgets/goals_card.dart';
 import '../widgets/guara.dart';
 import '../widgets/pace_ui.dart';
+import 'achievements_screen.dart';
+import 'plans_screen.dart';
+import 'records_screen.dart';
 
 enum EvoPeriod { d7, d30, d90, m12, all }
 
@@ -96,6 +101,10 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
               children: [
                 const Appear(child: ScreenTitle('Evolução')),
                 const SizedBox(height: 14),
+                Appear(delayMs: 60, child: _Shortcuts(app: app)),
+                const SectionTitle('Metas'),
+                const Appear(delayMs: 120, child: GoalsCard()),
+                const SectionTitle('Seus números'),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -262,6 +271,56 @@ class _Cmp extends StatelessWidget {
             ],
           ],
         ),
+      ],
+    );
+  }
+}
+
+/// Atalhos para Recordes, Conquistas e Planos.
+class _Shortcuts extends StatelessWidget {
+  final AppState app;
+  const _Shortcuts({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final r5 = app.records.byKey('effort_5000');
+    final badges = app.badges;
+    final got = badges.where((b) => b.unlocked).length;
+    final plan = app.plan;
+    void open(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
+    Widget tile(IconData icon, Color c, String title, String value, String sub, Widget page) => Expanded(
+          child: GlassCard(
+            radius: 20,
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            onTap: () => open(page),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: c, size: 22),
+                const SizedBox(height: 8),
+                Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: const Pal(true).muted)),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(value, style: numStyle(18, color: Colors.white)),
+                ),
+                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: const Pal(true).muted)),
+              ],
+            ),
+          ),
+        );
+    return Row(
+      children: [
+        tile(Icons.emoji_events_rounded, const Color(0xFFFFC53D), 'Recordes', r5 == null ? '—' : recordValue(r5),
+            r5 == null ? 'Melhor 5 km' : 'Melhor 5 km', const RecordsScreen()),
+        const SizedBox(width: 10),
+        tile(Icons.military_tech_rounded, const Color(0xFFB794F6), 'Conquistas', '$got/${badges.length}', 'medalhas',
+            const AchievementsScreen()),
+        const SizedBox(width: 10),
+        tile(Icons.event_note_rounded, PaceColors.mintBright, 'Plano',
+            plan?.plan == null ? 'Escolher' : '${plan!.done.length}/${plan.plan!.sessions.length}',
+            plan?.plan == null ? 'de treino' : plan!.plan!.name, const PlansScreen()),
       ],
     );
   }

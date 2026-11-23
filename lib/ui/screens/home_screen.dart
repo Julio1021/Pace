@@ -19,6 +19,7 @@ import '../widgets/pace_ui.dart';
 import '../widgets/route_widgets.dart';
 import 'activity_detail_screen.dart';
 import 'import_screen.dart';
+import 'plans_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -62,6 +63,19 @@ class HomeScreen extends StatelessWidget {
                         card: _GoalCard(app: app, now: now),
                       ),
                     ),
+                    if (app.plan?.plan != null && !app.plan!.finished) ...[
+                      const SizedBox(height: 12),
+                      Appear(
+                        delayMs: 120,
+                        child: PlanProgressCard(
+                          active: app.plan!,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => PlanDetailScreen(plan: app.plan!.plan!)),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Appear(delayMs: 160, child: _TodayRow(stats: app.dayStats(now), last: last, now: now)),
                     const SizedBox(height: 12),
@@ -397,6 +411,11 @@ class _EmptyHome extends StatelessWidget {
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
             icon: const Icon(Icons.upload_file),
             label: const Text('Importar histórico'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen())),
+            icon: const Icon(Icons.event_note_rounded),
+            label: const Text('Seguir um plano de treino'),
           ),
         ],
       ),
