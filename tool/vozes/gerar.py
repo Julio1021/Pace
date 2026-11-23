@@ -24,6 +24,10 @@ D = "_ _ vinte trinta quarenta cinquenta sessenta setenta oitenta noventa".split
 def ext(n: int, fem=False) -> str:
     if n == 100:
         return "cem"
+    if 100 < n < 200:
+        return "cento e " + ext(n - 100, fem)
+    if n == 200:
+        return "duzentos"
     if n < 20:
         w = U[n]
     else:
@@ -46,9 +50,11 @@ def trechos():
     for f in ["Corrida iniciada.", "Corrida pausada.", "Corrida retomada.", "Retomando.",
               "Pausa automática.", "Corrida encerrada.", "Meta atingida!", "Tempo",
               "Último quilômetro em", "Pace médio",
-              "Bora! Mais um quilômetro. Você está mandando bem."]:
+              "Bora! Mais um quilômetro. Você está mandando bem.",
+              "Pedal iniciado.", "Pedal pausado.", "Pedal retomado.", "Pedal encerrado.",
+              "Velocidade média"]:
         t[f] = f
-    for n in range(1, 101):
+    for n in range(1, 201):
         t[f"{n} {'quilômetro' if n == 1 else 'quilômetros'}."] = f"{ext(n)} {'quilômetro' if n == 1 else 'quilômetros'}."
         t[f"Volta {n}."] = f"Volta {ext(n)}."
     for n in range(1, 10):
@@ -62,8 +68,11 @@ def trechos():
         t[f"{n} {w}"] = f"{ext(n)} {w}"
         if n:
             t[f"e {n} {w}"] = f"e {ext(n)} {w}"
-    for n in range(0, 101):
+    for n in range(0, 201):
         t[f"{n} vírgula"] = f"{ext(n)} vírgula"
+    for n in range(0, 100):
+        w = "quilômetro" if n == 1 else "quilômetros"
+        t[f"{n} {w} por hora."] = f"{ext(n)} {w} por hora."
     for n in range(0, 100):
         t[f"{n:02d} quilômetros."] = (f"zero {ext(n)}" if n < 10 else ext(n)) + " quilômetros."
     return t
