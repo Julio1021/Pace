@@ -5,7 +5,7 @@ Aplicativo Android (Flutter) de corrida de rua: grava corridas por GPS (inclusiv
 ## Baixar no celular
 
 Abra a Release **ultima** do repositório e baixe o `pace.apk`:
-https://github.com/Julio1021/Pace./releases/tag/ultima
+https://github.com/Julio1021/Pace/releases/tag/ultima
 
 ## Assinatura (uma vez só)
 
