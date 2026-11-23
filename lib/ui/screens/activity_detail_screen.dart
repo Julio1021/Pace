@@ -631,14 +631,16 @@ class _Highlights extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    for (final m in medals)
+                    for (final (k, m) in medals.indexed)
                       GestureDetector(
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementsScreen())),
                         child: SizedBox(
                           width: 84,
                           child: Column(
                             children: [
-                              BadgeMedal(badge: m, size: 58),
+                              fresh
+                                  ? MedalDrop(delayMs: k * 180, child: BadgeMedal(badge: m, size: 66, shine: true))
+                                  : BadgeMedal(badge: m, size: 66),
                               const SizedBox(height: 4),
                               Text(m.title,
                                   textAlign: TextAlign.center,

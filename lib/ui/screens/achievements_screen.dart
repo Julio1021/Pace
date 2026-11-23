@@ -74,7 +74,7 @@ class AchievementsScreen extends StatelessWidget {
                             padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
                             child: Column(
                               children: [
-                                BadgeMedal(badge: b, size: 62),
+                                BadgeMedal(badge: b, size: 70),
                                 const SizedBox(height: 6),
                                 Text(
                                   b.title,
@@ -112,7 +112,7 @@ class AchievementsScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              BadgeMedal(badge: b, size: 96),
+              BadgeMedal(badge: b, size: 118, shine: true),
               const SizedBox(height: 12),
               Text(b.title, style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),

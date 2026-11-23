@@ -25,6 +25,9 @@ class Achievement {
   final String icon;
   final int color;
 
+  /// Nível do metal: 0 bronze, 1 prata, 2 ouro, 3 platina.
+  final int tier;
+
   /// Data em que foi desbloqueada (UTC) e a corrida responsável, se houver.
   final DateTime? unlockedAt;
   final int? activityId;
@@ -40,6 +43,7 @@ class Achievement {
     required this.description,
     required this.icon,
     required this.color,
+    this.tier = 0,
     this.unlockedAt,
     this.activityId,
     this.progress = 0,
@@ -217,6 +221,7 @@ List<Achievement> computeAchievements(
         description: d.$4,
         icon: d.$5,
         color: d.$6,
+        tier: _tiers[d.$1] ?? 0,
         unlockedAt: unlocked[d.$1]?.$1,
         activityId: unlocked[d.$1]?.$2,
         progress: unlocked.containsKey(d.$1) ? 1 : (d.$7?.$1 ?? 0),
@@ -230,3 +235,17 @@ String _mmss(double s) {
   final h = t ~/ 3600, m = (t % 3600) ~/ 60, sec = t % 60;
   return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}' : '$m:${sec.toString().padLeft(2, '0')}';
 }
+
+/// Metal de cada conquista: fáceis em bronze, médias em prata, difíceis em ouro, lendárias em platina.
+const _tiers = <String, int>{
+  'runs_10': 0, 'runs_50': 1, 'runs_100': 2, 'runs_250': 3,
+  'dist_5k': 0, 'dist_10k': 1, 'dist_15k': 1, 'dist_21k': 2, 'dist_42k': 3,
+  'hour_run': 1, 'climb_100': 1,
+  'total_50': 0, 'total_100': 1, 'total_250': 1, 'total_500': 2, 'total_1000': 2, 'total_2500': 3,
+  'week_30': 1, 'month_100': 2,
+  'streak_4': 0, 'streak_8': 1, 'streak_12': 2, 'streak_26': 3,
+  'goal_week_1': 0, 'goal_week_10': 2,
+  'early_bird': 0, 'early_bird_10': 1, 'night_owl': 0, 'night_owl_10': 1,
+  'sub30_5k': 1, 'sub25_5k': 2, 'sub60_10k': 1, 'sub50_10k': 2,
+  'pace_6': 1, 'pace_5': 2,
+};

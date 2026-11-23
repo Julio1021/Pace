@@ -20,7 +20,9 @@ import 'package:pace/services/recorder.dart';
 import 'package:pace/state/app_state.dart';
 import 'package:pace/ui/intro_overlay.dart';
 import 'package:pace/ui/screens/activity_detail_screen.dart';
+import 'package:pace/domain/achievements.dart';
 import 'package:pace/domain/plans.dart';
+import 'package:pace/ui/widgets/achievement_widgets.dart';
 import 'package:pace/ui/screens/home_screen.dart';
 import 'package:pace/ui/screens/reminders_screen.dart';
 import 'package:pace/ui/screens/records_screen.dart';
@@ -322,6 +324,48 @@ void main() {
     await _shot(tester, '27-calendario', height: 1100);
     await _tab(tester, 'Perfil');
     await _shot(tester, '28-perfil', height: 2200);
+  }, skip: !_enabled);
+
+  testWidgets('29 todas as medalhas', (tester) async {
+    final env = await _makeEnv(tester);
+    final all = [
+      for (final b in computeAchievements(const [], const {}))
+        Achievement(
+          id: b.id,
+          group: b.group,
+          title: b.title,
+          description: b.description,
+          icon: b.icon,
+          color: b.color,
+          tier: b.tier,
+          unlockedAt: DateTime.utc(2026),
+        ),
+    ];
+    final locked = computeAchievements(const [], const {}).take(4).toList();
+    await tester.pumpWidget(_wrap(
+      env,
+      Scaffold(
+        backgroundColor: const Color(0xFF161B23),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(8),
+          child: Wrap(
+            spacing: 4,
+            runSpacing: 6,
+            children: [
+              for (final b in [...all, ...locked])
+                SizedBox(
+                  width: 90,
+                  child: Column(children: [
+                    BadgeMedal(badge: b, size: 80),
+                    Text(b.title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 10)),
+                  ]),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ));
+    await _shot(tester, '29-medalhas', height: 1650);
   }, skip: !_enabled);
 
   testWidgets('12 início vazio', (tester) async {

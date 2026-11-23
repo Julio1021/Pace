@@ -72,4 +72,13 @@ class GuaraArt {
 <ellipse cx="50" cy="47" rx="5" ry="4" fill="#1F1A17"/>
 <rect x="-12" y="16" width="52" height="8" rx="4" fill="#12B886"/><path d="M-12 20 l-10 -4 l2 10z" fill="#12B886"/>
 <path d="M-8 46 Q14 62 34 58" fill="#FDF3E7"/><path d="M5 32 q5 4 10 0" fill="none" stroke="#1F1A17" stroke-width="2.8" stroke-linecap="round"/><path d="M21 32 q5 4 10 0" fill="none" stroke="#1F1A17" stroke-width="2.8" stroke-linecap="round"/><path d="M32 52 Q36 54 40 52" fill="none" stroke="#1F1A17" stroke-width="2.2" stroke-linecap="round"/></g></svg>''';
+
+  /// Só a cabeça do Guará feliz (para o centro das medalhas de platina).
+  static const head = r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="-26 -22 80 80" width="80" height="80"><g><path d="M-6 22 L-14 -18 L8 6z" fill="#E8762E"/><path d="M-9 14 L-12 -8 L2 6z" fill="#FDF3E7" fill-opacity=".85"/>
+<path d="M22 20 L34 -16 L38 14z" fill="#E8762E"/><path d="M26 14 L33 -6 L34 12z" fill="#FDF3E7" fill-opacity=".85"/>
+<ellipse cx="14" cy="34" rx="26" ry="22" fill="#E8762E"/>
+<path d="M14 40 Q34 38 50 46 Q46 56 30 56 Q16 54 14 40z" fill="#FDF3E7"/>
+<ellipse cx="50" cy="47" rx="5" ry="4" fill="#1F1A17"/>
+<rect x="-12" y="16" width="52" height="8" rx="4" fill="#12B886"/><path d="M-12 20 l-10 -4 l2 10z" fill="#12B886"/>
+<path d="M-8 46 Q14 62 34 58" fill="#FDF3E7"/><path d="M5 33 q5 -6 10 0" fill="none" stroke="#1F1A17" stroke-width="2.8" stroke-linecap="round"/><path d="M21 33 q5 -6 10 0" fill="none" stroke="#1F1A17" stroke-width="2.8" stroke-linecap="round"/><path d="M28 50 Q36 62 44 50z" fill="#1F1A17"/><path d="M31 54 Q36 59 41 54" fill="#FF7A8A"/></g></svg>''';
 }
