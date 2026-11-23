@@ -76,7 +76,7 @@ class _CloudBackupScreenState extends State<CloudBackupScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Suas corridas ficam guardadas na sua conta pCloud, numa pasta só do PACE. '
+                  'Suas corridas ficam guardadas na sua conta pCloud, na pasta “PACE Backups”. '
                   'O envio é automático depois de cada corrida e uma vez por semana.',
                   style: TextStyle(color: mut, height: 1.35),
                 ),
@@ -109,7 +109,7 @@ class _CloudBackupScreenState extends State<CloudBackupScreen> {
               TextButton(onPressed: PCloudService.cancelLogin, child: const Text('Cancelar')),
             const SizedBox(height: 8),
             Text(
-              'Abre a página da pCloud para você entrar e autorizar. O PACE não vê sua senha e só tem acesso à própria pasta.',
+              'Abre a página da pCloud para você entrar e autorizar. O PACE não vê sua senha e só mexe na pasta “PACE Backups”.',
               style: TextStyle(fontSize: 12.5, color: mut),
             ),
           ] else ...[
@@ -189,7 +189,7 @@ class _CloudBackupScreenState extends State<CloudBackupScreen> {
               label: const Text('Desconectar'),
             ),
             const SizedBox(height: 6),
-            Text('Os backups continuam no seu pCloud, na pasta Applications/PACE.',
+            Text('Os backups continuam no seu pCloud, na pasta “PACE Backups”.',
                 style: TextStyle(fontSize: 12, color: mut)),
           ],
           if (app.cloudError != null) ...[

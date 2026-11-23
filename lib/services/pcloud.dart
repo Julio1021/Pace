@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 
 /// Client ID do app "PACE" cadastrado em https://docs.pcloud.com/my_apps/
 /// (vazio até a pCloud aprovar). Pode vir do build: --dart-define=PCLOUD_CLIENT_ID=...
-const pcloudClientId = String.fromEnvironment('PCLOUD_CLIENT_ID', defaultValue: '');
+const pcloudClientId = String.fromEnvironment('PCLOUD_CLIENT_ID', defaultValue: 'raVzkVA4chb');
 
 /// Endereço de retorno cadastrado no app da pCloud (Redirect URI).
 const pcloudRedirect = 'pace-pcloud://oauth';
@@ -28,14 +28,27 @@ class PCloudException implements Exception {
   String toString() => message;
 }
 
+/// Pasta dos backups na conta (o app tem acesso a todas as pastas,
+/// então tudo fica guardado só aqui para não espalhar arquivos).
+const pcloudFolder = '/PACE Backups';
+
 /// Conexão com o pCloud: login (OAuth no navegador), envio, lista, download e limpeza.
-/// Com acesso "Private", o app só enxerga a própria pasta (Applications/PACE).
 class PCloudService {
   static const _ch = MethodChannel('pace/run_notification');
 
   final String token;
   final String host; // api.pcloud.com (EUA) ou eapi.pcloud.com (Europa)
-  const PCloudService(this.token, this.host);
+  PCloudService(this.token, this.host);
+
+  int? _folderId;
+
+  /// Cria (se preciso) e devolve a pasta "PACE Backups".
+  Future<int> _folder() async {
+    final f = _folderId;
+    if (f != null) return f;
+    final j = await _call('createfolderifnotexists', {'path': pcloudFolder});
+    return _folderId = ((j['metadata'] as Map)['folderid'] as num).toInt();
+  }
 
   static bool get configured => pcloudClientId.isNotEmpty;
 
@@ -114,7 +127,7 @@ class PCloudService {
   Future<void> upload(String name, Uint8List bytes) async {
     final uri = Uri.https(host, '/uploadfile', {
       'access_token': token,
-      'folderid': '0',
+      'folderid': '${await _folder()}',
       'filename': name,
       'nopartial': '1',
     });
@@ -145,7 +158,7 @@ class PCloudService {
 
   /// Backups do PACE na pasta do app, do mais novo para o mais antigo.
   Future<List<CloudBackup>> list() async {
-    final j = await _call('listfolder', {'folderid': '0'});
+    final j = await _call('listfolder', {'folderid': '${await _folder()}'});
     final contents = ((j['metadata'] as Map?)?['contents'] as List?) ?? const [];
     final out = <CloudBackup>[];
     for (final m in contents.cast<Map>()) {
