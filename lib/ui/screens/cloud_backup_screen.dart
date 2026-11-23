@@ -25,7 +25,6 @@ class _CloudBackupScreenState extends State<CloudBackupScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
 
   Future<void> _refresh() async {
@@ -61,9 +60,17 @@ class _CloudBackupScreenState extends State<CloudBackupScreen> {
     }
   }
 
+  Object? _seen = const Object();
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    // Atualiza a lista quando conecta ou termina um backup.
+    final key = app.pcloudConnected ? app.lastCloudBackup : null;
+    if (key != _seen && !app.cloudBusy) {
+      _seen = key;
+      if (app.pcloudConnected) WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+    }
     final mut = Pal.of(context).muted;
     return Scaffold(
       appBar: AppBar(title: const Text('Backup no pCloud')),
@@ -148,7 +155,6 @@ class _CloudBackupScreenState extends State<CloudBackupScreen> {
                             final ok = await context.read<AppState>().backupToCloud();
                             if (!context.mounted) return;
                             showSnack(context, ok ? 'Backup enviado para o pCloud.' : 'Não foi possível enviar.');
-                            _refresh();
                           },
                     icon: const Icon(Icons.cloud_upload_rounded),
                     label: const Text('Fazer backup agora'),

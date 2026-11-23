@@ -169,11 +169,24 @@ class PCloudService {
         (m['fileid'] as num).toInt(),
         name,
         (m['size'] as num?)?.toInt() ?? 0,
-        HttpDate.parse('${m['created']}').toLocal(),
+        parseDate('${m['created']}'),
       ));
     }
     out.sort((a, b) => b.created.compareTo(a.created));
     return out;
+  }
+
+  /// Datas da pCloud: "Mon, 23 Nov 2026 19:28:00 +0000".
+  static DateTime parseDate(String v) {
+    final m = RegExp(r'(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2})(?: ([+-])(\d{2})(\d{2}))?').firstMatch(v);
+    if (m == null) return DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var t = DateTime.utc(int.parse(m[3]!), months.indexOf(m[2]!) + 1, int.parse(m[1]!), int.parse(m[4]!), int.parse(m[5]!), int.parse(m[6]!));
+    if (m[7] != null) {
+      final off = Duration(hours: int.parse(m[8]!), minutes: int.parse(m[9]!));
+      t = m[7] == '+' ? t.subtract(off) : t.add(off);
+    }
+    return t.toLocal();
   }
 
   Future<Uint8List> download(int fileId) async {

@@ -15,4 +15,9 @@ void main() {
   test('recusa vira erro claro', () {
     expect(() => PCloudService.parseRedirect('pace-pcloud://oauth#error=access_denied'), throwsA(isA<PCloudException>()));
   });
+
+  test('data da pCloud (+0000) vira hora certa', () {
+    final d = PCloudService.parseDate('Mon, 23 Nov 2026 19:28:05 +0000').toUtc();
+    expect(d, DateTime.utc(2026, 11, 23, 19, 28, 5));
+  });
 }
