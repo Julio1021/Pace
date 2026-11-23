@@ -281,7 +281,6 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         ? cs.onSurfaceVariant
         : (_accuracy! <= 8 ? Pal.of(context).mintText : (_accuracy! <= 20 ? PaceColors.mintDark : PaceColors.orange));
 
-    final pal = Pal.of(context);
     final now = RunSetupScreen.clock();
     final app = context.watch<AppState>();
     var lat = SkyInfo.defaultLat, lon = SkyInfo.defaultLon;
@@ -618,7 +617,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                   }),
               ],
             ),
-          ),,
+          ),
           ),
         ],
       ),
