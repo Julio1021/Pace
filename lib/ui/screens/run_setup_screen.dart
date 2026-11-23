@@ -343,23 +343,27 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           Appear(
             child: Row(
               children: [
-                Expanded(child: Text('Correr', style: numStyle(28, color: onSky))),
+                Text('Correr', style: numStyle(28, color: onSky)),
+                const SizedBox(width: 10),
+                // Sinal do GPS: só um pontinho colorido (toque para ver a precisão).
                 if (_hasPermission && _serviceOn)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: pal.card.withValues(alpha: 0.88), borderRadius: BorderRadius.circular(999)),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _Blink(color: qColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          _accuracy == null ? 'Procurando GPS…' : 'GPS ${quality.toLowerCase()} · ${_accuracy!.round()} m',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: qColor),
+                  Tooltip(
+                    triggerMode: TooltipTriggerMode.tap,
+                    showDuration: const Duration(seconds: 3),
+                    message: _accuracy == null ? 'Procurando GPS…' : 'GPS ${quality.toLowerCase()} · precisão de ${_accuracy!.round()} m',
+                    child: Semantics(
+                      label: _accuracy == null ? 'Procurando GPS' : 'GPS ${quality.toLowerCase()}',
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.55),
                         ),
-                      ],
+                        child: _Blink(color: qColor),
+                      ),
                     ),
                   ),
+                const Spacer(),
               ],
             ),
           ),
@@ -540,8 +544,15 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               ],
             ),
           ),
-          const SectionTitle('Durante a corrida'),
-          GlassCard(
+          const SizedBox(height: 14),
+          _SettingsFlag(
+            summary: [
+              _autoPause ? 'Pausa auto' : 'Sem pausa auto',
+              _voice ? 'Voz a cada ${context.watch<AppState>().voiceEveryKm} km' : 'Voz desligada',
+              if (_autoLap > 0) 'Volta ${(_autoLap / 1000).round()} km',
+              context.watch<AppState>().coachStyle.label.split(' ').first,
+            ].join(' · '),
+            child: GlassCard(
             tint: 0.6,
             padding: EdgeInsets.zero,
             child: Column(
@@ -607,6 +618,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                   }),
               ],
             ),
+          ),,
           ),
         ],
       ),
@@ -930,6 +942,81 @@ class _CountdownState extends State<_Countdown> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Ajustes da corrida" recolhível: mostra um resumo e abre ao tocar.
+class _SettingsFlag extends StatefulWidget {
+  final String summary;
+  final Widget child;
+  const _SettingsFlag({required this.summary, required this.child});
+
+  @override
+  State<_SettingsFlag> createState() => _SettingsFlagState();
+}
+
+class _SettingsFlagState extends State<_SettingsFlag> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: _open,
+          label: 'Ajustes da corrida',
+          child: GestureDetector(
+            onTap: () => setState(() => _open = !_open),
+            child: GlassCard(
+              tint: 0.6,
+              radius: 18,
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: PaceColors.mintBright.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.tune_rounded, size: 19, color: PaceColors.mintBright),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Ajustes da corrida',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white)),
+                        const SizedBox(height: 2),
+                        Text(widget.summary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: const Pal(true).muted, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _open ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 220),
+                    child: Icon(Icons.expand_more_rounded, color: const Pal(true).muted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _open ? Padding(padding: const EdgeInsets.only(top: 8), child: widget.child) : const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }
