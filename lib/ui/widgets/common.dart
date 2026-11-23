@@ -67,11 +67,15 @@ class StatTile extends StatelessWidget {
           textBaseline: TextBaseline.alphabetic,
           children: [
             Flexible(
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: numStyle(large ? 30 : 22, color: color ?? Theme.of(context).colorScheme.onSurface),
+              // Encolhe em vez de cortar com "…" (ex.: "8 h 36 min").
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: numStyle(large ? 30 : 22, color: color ?? Theme.of(context).colorScheme.onSurface),
+                ),
               ),
             ),
             if (unit != null) ...[

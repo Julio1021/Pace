@@ -173,8 +173,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       return Scaffold(appBar: AppBar(), body: const Center(child: Text('Corrida não encontrada.')));
     }
     final a = b.activity;
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
     final route = b.points.where((p) => !p.paused).map((p) => LatLng(p.lat, p.lon)).toList();
     final paceData = Calc.paceSeries(b.points);
     final altData = Calc.altitudeSeries(b.points);
