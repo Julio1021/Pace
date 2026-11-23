@@ -60,38 +60,31 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   RunPreset? _applied;
   bool _restored = false;
 
-  // Posições medidas para descer o botão e os cards e alinhar os morros.
+  // Posições medidas: o bloco do botão fica o mais baixo possível,
+  // logo acima da barra de navegação, e os morros acompanham o botão.
   final _topKey = GlobalKey();
   final _btnKey = GlobalKey();
   final _bottomKey = GlobalKey();
   double _gapTop = 22;
-  double _gapBottom = 18;
   double? _btnCenter;
+
+  /// Espaço reservado para a barra de navegação flutuante (com o botão central).
+  static const _navGap = 122.0;
 
   void _measure() {
     if (!mounted || (_scroll.hasClients && _scroll.offset > 0)) return;
     final top = _topKey.currentContext?.findRenderObject() as RenderBox?;
     final btn = _btnKey.currentContext?.findRenderObject() as RenderBox?;
-    final bottom = _bottomKey.currentContext?.findRenderObject() as RenderBox?;
-    if (top == null || btn == null || bottom == null || !top.hasSize || !btn.hasSize || !bottom.hasSize) return;
-    final mq = MediaQuery.of(context);
-    final screenH = mq.size.height;
+    final block = _bottomKey.currentContext?.findRenderObject() as RenderBox?;
+    if (top == null || btn == null || block == null || !top.hasSize || !btn.hasSize || !block.hasSize) return;
+    final screenH = MediaQuery.of(context).size.height;
     final topEnd = top.localToGlobal(Offset(0, top.size.height)).dy;
-    final btnH = btn.size.height;
-    final bottomH = bottom.size.height;
-    // Botão perto do meio da tela; cards logo acima da barra de navegação.
-    final navTop = screenH - 112;
-    var wantTop = math.max(22.0, screenH * 0.5 - btnH / 2 - topEnd);
-    var wantBottom = navTop - (topEnd + wantTop + btnH) - bottomH;
-    if (wantBottom < 18) {
-      wantTop = math.max(22.0, wantTop + wantBottom - 18);
-      wantBottom = 18;
-    }
-    final center = topEnd + wantTop + btnH / 2;
-    if ((wantTop - _gapTop).abs() > 1 || (wantBottom - _gapBottom).abs() > 1 || _btnCenter == null || (center - _btnCenter!).abs() > 1) {
+    final wantTop = math.max(22.0, screenH - _navGap - topEnd - block.size.height);
+    final btnCenterNow = btn.localToGlobal(Offset(0, btn.size.height / 2)).dy;
+    final center = btnCenterNow + (wantTop - _gapTop);
+    if ((wantTop - _gapTop).abs() > 1 || _btnCenter == null || (center - _btnCenter!).abs() > 1) {
       setState(() {
         _gapTop = wantTop;
-        _gapBottom = wantBottom;
         _btnCenter = center;
       });
     }
@@ -153,6 +146,221 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     if (snap == _savedSnap) return;
     _savedSnap = snap;
     app.db.setKv('run_setup', snap);
+  }
+
+
+  String _summary(AppState app) => [
+        _type,
+        switch (_goal) {
+          GoalType.none => 'Sem meta',
+          GoalType.distance =>
+            'Meta ${_goalKm == _goalKm.roundToDouble() ? _goalKm.toStringAsFixed(0) : _goalKm.toStringAsFixed(1).replaceAll('.', ',')} km',
+          GoalType.time => 'Meta $_goalMin min',
+        },
+        if (!_voice) 'Sem voz' else 'Voz ${app.sport == Sport.bike ? app.bikeVoiceEveryKm : app.voiceEveryKm} km',
+      ].join(' · ');
+
+  /// Treino e ajustes num painel que sobe de baixo (duas abas).
+  Future<void> _openSettings() async {
+    HapticFeedback.selectionClick();
+    var tab = 0;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: PaceColors.bgDark,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (sheetCtx) => Theme(
+        data: glassTheme,
+        child: StatefulBuilder(builder: (context, setSheet) {
+          void upd(VoidCallback fn) {
+            setState(fn);
+            setSheet(() {});
+          }
+
+          final app = context.watch<AppState>();
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.86),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.paddingOf(context).bottom),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<int>(
+                    showSelectedIcon: false,
+                    segments: [
+                      ButtonSegment(
+                        value: 0,
+                        icon: Icon(app.sport == Sport.bike ? Icons.directions_bike_rounded : Icons.directions_run_rounded, size: 18),
+                        label: const Text('Treino'),
+                      ),
+                      ButtonSegment(
+                        value: 1,
+                        icon: const Icon(Icons.tune_rounded, size: 18),
+                        label: Text(app.sport == Sport.bike ? 'Ajustes do pedal' : 'Ajustes da corrida'),
+                      ),
+                    ],
+                    selected: {tab},
+                    onSelectionChanged: (v) => setSheet(() => tab = v.first),
+                  ),
+                  const SizedBox(height: 14),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    alignment: Alignment.topCenter,
+                    child: tab == 0
+                        ? GlassCard(
+            tint: 0.6,
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 0, 4),
+                    child: Text('Tipo de treino', style: glassTheme.textTheme.titleSmall),
+                  ),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  child: Row(
+                    children: [
+                      for (final ty in app.sport.types)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _TypePill(
+                            text: ty,
+                            selected: ty == _type,
+                            onTap: () => upd(() => _type = ty),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Meta', style: glassTheme.textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      GoalModePicker<GoalType>(
+                        options: const [
+                          (GoalType.none, 'Livre', Icons.all_inclusive_rounded),
+                          (GoalType.distance, 'Distância', Icons.straighten_rounded),
+                          (GoalType.time, 'Tempo', Icons.timer_outlined),
+                        ],
+                        value: _goal,
+                        onChanged: (g) => upd(() => _goal = g),
+                      ),
+                      if (_goal == GoalType.distance)
+                        GoalEditor(byTime: false, value: _goalKm, onChanged: (v) => upd(() => _goalKm = v)),
+                      if (_goal == GoalType.time)
+                        GoalEditor(byTime: true, value: _goalMin.toDouble(), onChanged: (v) => upd(() => _goalMin = v.round())),
+                      if (_goal == GoalType.none)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                              app.sport == Sport.bike
+                                  ? 'Sem alvo: pedale o quanto quiser e encerre quando der.'
+                                  : 'Sem alvo: corra o quanto quiser e encerre quando der.',
+                              style: TextStyle(fontSize: 12.5, color: const Pal(true).muted)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+                        : GlassCard(
+            tint: 0.6,
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Volta automática'),
+                  trailing: DropdownButton<double>(
+                    value: _autoLap,
+                    underline: const SizedBox(),
+                    items: [
+                      const DropdownMenuItem(value: 0.0, child: Text('Desligada')),
+                      const DropdownMenuItem(value: 1000.0, child: Text('A cada 1 km')),
+                      const DropdownMenuItem(value: 5000.0, child: Text('A cada 5 km')),
+                      if (app.sport == Sport.bike || _autoLap == 10000)
+                        const DropdownMenuItem(value: 10000.0, child: Text('A cada 10 km')),
+                    ],
+                    onChanged: (v) => upd(() => _autoLap = v ?? 0),
+                  ),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.pause_circle_outline),
+                  title: const Text('Pausa automática'),
+                  subtitle: const Text('Pausa quando você para (semáforo, por exemplo)'),
+                  value: _autoPause,
+                  onChanged: (v) => upd(() => _autoPause = v),
+                ),
+                const Divider(height: 1),
+                Builder(builder: (context) {
+                  final app = context.watch<AppState>();
+                  return ListTile(
+                    leading: const Icon(Icons.campaign_outlined),
+                    title: const Text('Mensagens de incentivo'),
+                    subtitle: Text(app.coachStyle.hint),
+                    trailing: DropdownButton<CoachStyle>(
+                      value: app.coachStyle,
+                      underline: const SizedBox(),
+                      items: [
+                        for (final s in CoachStyle.values)
+                          DropdownMenuItem(value: s, child: Text(s.label.split(' ').first)),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) app.setCoachStyle(v);
+                      },
+                    ),
+                  );
+                }),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.record_voice_over_outlined),
+                  title: const Text('Avisos por voz'),
+                  subtitle: Text(app.sport == Sport.bike ? 'Tempo, distância, velocidade e incentivo' : 'Tempo, distância, pace e incentivo'),
+                  value: _voice,
+                  onChanged: (v) => upd(() => _voice = v),
+                ),
+                if (_voice)
+                  Builder(builder: (context) {
+                    final app = context.watch<AppState>();
+                    return ListTile(
+                      leading: const Icon(Icons.straighten_rounded),
+                      title: const Text('Avisar a cada'),
+                      trailing: app.sport == Sport.bike
+                          ? VoiceEveryPicker(
+                              value: app.bikeVoiceEveryKm,
+                              onChanged: app.setBikeVoiceEveryKm,
+                              options: VoiceEveryPicker.bikeOptions,
+                            )
+                          : VoiceEveryPicker(value: app.voiceEveryKm, onChanged: app.setVoiceEveryKm),
+                    );
+                  }),
+              ],
+            ),
+          ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(sheetCtx),
+                    child: const Text('Pronto'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
   }
 
   @override
@@ -496,30 +704,6 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             ),
           ),
           SizedBox(height: _gapTop),
-          Appear(
-            key: _btnKey,
-            delayMs: 120,
-            child: Center(
-              child: Builder(builder: (context) {
-                if (app.sport == Sport.bike) {
-                  final wk = PeriodStats.of(Periods.between(app.rides, Periods.weekStart(now), now.add(const Duration(days: 1)))).distanceM;
-                  final caption = wk <= 0 ? 'Bora pedalar?' : '${Fmt.km(wk, decimals: 1)} km\npedalados na semana';
-                  return _StartButton(onTap: _starting ? null : () => _start(), progress: 0, caption: caption, bike: true);
-                }
-                final goal = app.profile.weeklyGoalKm;
-                final km = app.weekStats(now).distanceM / 1000;
-                final prog = goal > 0 ? km / goal : 0.0;
-                final caption = goal <= 0
-                    ? 'Bora correr?'
-                    : prog >= 1
-                        ? 'Meta da semana\nbatida!'
-                        : '${Fmt.km(km * 1000, decimals: 1)} de '
-                            '${goal == goal.roundToDouble() ? goal.toInt() : Fmt.km(goal * 1000, decimals: 1)} km\nna semana';
-                return _StartButton(onTap: _starting ? null : () => _start(), progress: prog, caption: caption);
-              }),
-            ),
-          ),
-          SizedBox(height: _gapBottom),
           Column(
             key: _bottomKey,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -552,7 +736,6 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               onTap: _askBattery,
             ),
           ],
-          const SizedBox(height: 8),
           if (_applied != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -596,174 +779,53 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 ),
               ),
             ),
-          _SettingsFlag(
-            title: 'Treino',
-            icon: app.sport == Sport.bike ? Icons.directions_bike_rounded : Icons.directions_run_rounded,
-            summary: [
-              _type,
-              switch (_goal) {
-                GoalType.none => 'Sem meta',
-                GoalType.distance => 'Meta ${_goalKm == _goalKm.roundToDouble() ? _goalKm.toStringAsFixed(0) : _goalKm.toStringAsFixed(1).replaceAll('.', ',')} km',
-                GoalType.time => 'Meta $_goalMin min',
-              },
-            ].join(' · '),
-            child: GlassCard(
-            tint: 0.6,
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 0, 4),
-                    child: Text('Tipo de treino', style: glassTheme.textTheme.titleSmall),
-                  ),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-                  child: Row(
-                    children: [
-                      for (final ty in app.sport.types)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: _TypePill(
-                            text: ty,
-                            selected: ty == _type,
-                            onTap: () => setState(() => _type = ty),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Meta', style: glassTheme.textTheme.titleSmall),
-                      const SizedBox(height: 8),
-                      GoalModePicker<GoalType>(
-                        options: const [
-                          (GoalType.none, 'Livre', Icons.all_inclusive_rounded),
-                          (GoalType.distance, 'Distância', Icons.straighten_rounded),
-                          (GoalType.time, 'Tempo', Icons.timer_outlined),
-                        ],
-                        value: _goal,
-                        onChanged: (g) => setState(() => _goal = g),
-                      ),
-                      if (_goal == GoalType.distance)
-                        GoalEditor(byTime: false, value: _goalKm, onChanged: (v) => setState(() => _goalKm = v)),
-                      if (_goal == GoalType.time)
-                        GoalEditor(byTime: true, value: _goalMin.toDouble(), onChanged: (v) => setState(() => _goalMin = v.round())),
-                      if (_goal == GoalType.none)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                              app.sport == Sport.bike
-                                  ? 'Sem alvo: pedale o quanto quiser e encerre quando der.'
-                                  : 'Sem alvo: corra o quanto quiser e encerre quando der.',
-                              style: TextStyle(fontSize: 12.5, color: const Pal(true).muted)),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ),
-          const SizedBox(height: 10),
-          _SettingsFlag(
-            title: app.sport == Sport.bike ? 'Ajustes do pedal' : 'Ajustes da corrida',
-            icon: Icons.tune_rounded,
-            summary: [
-              _autoPause ? 'Pausa auto' : 'Sem pausa auto',
-              _voice
-                  ? 'Voz a cada ${app.sport == Sport.bike ? app.bikeVoiceEveryKm : app.voiceEveryKm} km'
-                  : 'Voz desligada',
-              if (_autoLap > 0) 'Volta ${(_autoLap / 1000).round()} km',
-              context.watch<AppState>().coachStyle.label.split(' ').first,
-            ].join(' · '),
-            child: GlassCard(
-            tint: 0.6,
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.flag_outlined),
-                  title: const Text('Volta automática'),
-                  trailing: DropdownButton<double>(
-                    value: _autoLap,
-                    underline: const SizedBox(),
-                    items: [
-                      const DropdownMenuItem(value: 0.0, child: Text('Desligada')),
-                      const DropdownMenuItem(value: 1000.0, child: Text('A cada 1 km')),
-                      const DropdownMenuItem(value: 5000.0, child: Text('A cada 5 km')),
-                      if (app.sport == Sport.bike || _autoLap == 10000)
-                        const DropdownMenuItem(value: 10000.0, child: Text('A cada 10 km')),
-                    ],
-                    onChanged: (v) => setState(() => _autoLap = v ?? 0),
-                  ),
-                ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  secondary: const Icon(Icons.pause_circle_outline),
-                  title: const Text('Pausa automática'),
-                  subtitle: const Text('Pausa quando você para (semáforo, por exemplo)'),
-                  value: _autoPause,
-                  onChanged: (v) => setState(() => _autoPause = v),
-                ),
-                const Divider(height: 1),
-                Builder(builder: (context) {
-                  final app = context.watch<AppState>();
-                  return ListTile(
-                    leading: const Icon(Icons.campaign_outlined),
-                    title: const Text('Mensagens de incentivo'),
-                    subtitle: Text(app.coachStyle.hint),
-                    trailing: DropdownButton<CoachStyle>(
-                      value: app.coachStyle,
-                      underline: const SizedBox(),
-                      items: [
-                        for (final s in CoachStyle.values)
-                          DropdownMenuItem(value: s, child: Text(s.label.split(' ').first)),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) app.setCoachStyle(v);
-                      },
-                    ),
-                  );
-                }),
-                const Divider(height: 1),
-                SwitchListTile(
-                  secondary: const Icon(Icons.record_voice_over_outlined),
-                  title: const Text('Avisos por voz'),
-                  subtitle: Text(app.sport == Sport.bike ? 'Tempo, distância, velocidade e incentivo' : 'Tempo, distância, pace e incentivo'),
-                  value: _voice,
-                  onChanged: (v) => setState(() => _voice = v),
-                ),
-                if (_voice)
+          Appear(
+            delayMs: 120,
+            child: Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
                   Builder(builder: (context) {
-                    final app = context.watch<AppState>();
-                    return ListTile(
-                      leading: const Icon(Icons.straighten_rounded),
-                      title: const Text('Avisar a cada'),
-                      trailing: app.sport == Sport.bike
-                          ? VoiceEveryPicker(
-                              value: app.bikeVoiceEveryKm,
-                              onChanged: app.setBikeVoiceEveryKm,
-                              options: VoiceEveryPicker.bikeOptions,
-                            )
-                          : VoiceEveryPicker(value: app.voiceEveryKm, onChanged: app.setVoiceEveryKm),
-                    );
-                  }),
-              ],
+                if (app.sport == Sport.bike) {
+                  final wk = PeriodStats.of(Periods.between(app.rides, Periods.weekStart(now), now.add(const Duration(days: 1)))).distanceM;
+                  final caption = wk <= 0 ? 'Bora pedalar?' : '${Fmt.km(wk, decimals: 1)} km\npedalados na semana';
+                  return _StartButton(key: _btnKey, onTap: _starting ? null : () => _start(), progress: 0, caption: caption, bike: true);
+                }
+                final goal = app.profile.weeklyGoalKm;
+                final km = app.weekStats(now).distanceM / 1000;
+                final prog = goal > 0 ? km / goal : 0.0;
+                final caption = goal <= 0
+                    ? 'Bora correr?'
+                    : prog >= 1
+                        ? 'Meta da semana\nbatida!'
+                        : '${Fmt.km(km * 1000, decimals: 1)} de '
+                            '${goal == goal.roundToDouble() ? goal.toInt() : Fmt.km(goal * 1000, decimals: 1)} km\nna semana';
+                return _StartButton(key: _btnKey, onTap: _starting ? null : () => _start(), progress: prog, caption: caption);
+              }),
+                  // Engrenagem: abre treino e ajustes.
+                  Positioned(
+                    right: -44,
+                    bottom: 26,
+                    child: IconButton(
+                      key: const ValueKey('run-settings'),
+                      tooltip: 'Treino e ajustes',
+                      onPressed: _openSettings,
+                      icon: Icon(Icons.settings_rounded, size: 30, color: onSky.withValues(alpha: 0.92), shadows: const [
+                        Shadow(color: Color(0x55000000), blurRadius: 8),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+          const SizedBox(height: 2),
+          Center(
+            child: _SummaryPill(text: _summary(app), onTap: _openSettings),
           ),
             ],
           ),
-          const SizedBox(height: 112),
+          SizedBox(height: _navGap),
         ],
       ),
             ),
@@ -782,7 +844,7 @@ class _StartButton extends StatefulWidget {
   final double progress;
   final String caption;
   final bool bike;
-  const _StartButton({required this.onTap, required this.progress, required this.caption, this.bike = false});
+  const _StartButton({super.key, required this.onTap, required this.progress, required this.caption, this.bike = false});
 
   @override
   State<_StartButton> createState() => _StartButtonState();
@@ -1091,82 +1153,6 @@ class _CountdownState extends State<_Countdown> {
   }
 }
 
-/// "Ajustes da corrida" recolhível: mostra um resumo e abre ao tocar.
-class _SettingsFlag extends StatefulWidget {
-  final String title;
-  final IconData icon;
-  final String summary;
-  final Widget child;
-  const _SettingsFlag({required this.title, required this.icon, required this.summary, required this.child});
-
-  @override
-  State<_SettingsFlag> createState() => _SettingsFlagState();
-}
-
-class _SettingsFlagState extends State<_SettingsFlag> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          button: true,
-          expanded: _open,
-          label: widget.title,
-          child: GestureDetector(
-            onTap: () => setState(() => _open = !_open),
-            child: GlassCard(
-              tint: 0.6,
-              radius: 18,
-              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: PaceColors.mintBright.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(widget.icon, size: 19, color: PaceColors.mintBright),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.title,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white)),
-                        const SizedBox(height: 2),
-                        Text(widget.summary,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: const Pal(true).muted, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: _open ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 220),
-                    child: Icon(Icons.expand_more_rounded, color: const Pal(true).muted),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: _open ? Padding(padding: const EdgeInsets.only(top: 8), child: widget.child) : const SizedBox(width: double.infinity),
-        ),
-      ],
-    );
-  }
-}
 
 /// Ponto piscando (sinal de GPS).
 class _Blink extends StatefulWidget {
@@ -1379,6 +1365,40 @@ class _SportSwitch extends StatelessWidget {
             item(Sport.run, Icons.directions_run_rounded),
             item(Sport.bike, Icons.directions_bike_rounded),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Resumo do treino escolhido (toque abre a engrenagem).
+class _SummaryPill extends StatelessWidget {
+  final String text;
+  final VoidCallback onTap;
+  const _SummaryPill({required this.text, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Treino: $text. Toque para ajustar.',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 330),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: PaceColors.bgDark.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          ),
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+          ),
         ),
       ),
     );

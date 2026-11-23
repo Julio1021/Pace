@@ -258,13 +258,18 @@ void main() {
       await tester.pumpWidget(_wrap(env, const HomeShell()));
       await _settle(tester);
       await _tab(tester, 'Correr');
+      await _shot(tester, '05-correr-clima-${e.key}', height: 900);
       if (e.key == 'chuva') {
-        await tester.tap(find.text('Treino'));
+        // Engrenagem: painel com treino (meta por distância) e ajustes.
+        await tester.tap(find.byKey(const ValueKey('run-settings')));
         await _settle(tester);
         await tester.tap(find.text('Distância'));
         await _settle(tester);
+        await _shot(tester, '05-correr-engrenagem-treino', height: 900);
+        await tester.tap(find.text('Ajustes da corrida'));
+        await _settle(tester);
+        await _shot(tester, '05-correr-engrenagem-ajustes', height: 900);
       }
-      await _shot(tester, '05-correr-clima-${e.key}', height: e.key == 'chuva' ? 1250 : 900);
     }
     RunSetupScreen.clock = DateTime.now;
   }, skip: !_enabled);
@@ -483,10 +488,13 @@ void main() {
     await _settle(tester);
     await _tab(tester, 'Correr');
     await _shot(tester, '40-pedal-preparar', height: 1000);
-    await tester.ensureVisible(find.text('Ajustes do pedal'));
+    await tester.tap(find.byKey(const ValueKey('run-settings')));
+    await _settle(tester);
     await tester.tap(find.text('Ajustes do pedal'));
     await _settle(tester);
-    await _shot(tester, '41-pedal-ajustes', height: 1400);
+    await _shot(tester, '41-pedal-ajustes', height: 1000);
+    await tester.tap(find.text('Pronto'));
+    await _settle(tester);
     await _tab(tester, 'Histórico');
     await _shot(tester, '42-historico-com-pedal', height: 1100);
     final ride = env.app.rides.first;
