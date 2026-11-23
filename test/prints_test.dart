@@ -258,6 +258,8 @@ void main() {
       await _settle(tester);
       await _tab(tester, 'Correr');
       if (e.key == 'chuva') {
+        await tester.tap(find.text('Treino'));
+        await _settle(tester);
         await tester.tap(find.text('Distância'));
         await _settle(tester);
       }

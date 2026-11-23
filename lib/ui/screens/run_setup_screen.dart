@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -53,6 +54,8 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   bool _visible = false;
   bool _starting = false;
   RunPreset? _applied;
+  bool _restored = false;
+  String? _savedSnap;
   final _scroll = ScrollController();
   final _scrollPos = ValueNotifier<double>(0);
   Timer? _clock;
@@ -62,11 +65,50 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refreshStatus();
+    _restore();
     _scroll.addListener(() => _scrollPos.value = _scroll.offset);
     // Atualiza o céu a cada minuto (cores mudam aos poucos).
     _clock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted && widget.active) setState(() {});
     });
+  }
+
+  /// Volta os últimos ajustes usados (tipo, meta e opções da corrida).
+  Future<void> _restore() async {
+    try {
+      final raw = await context.read<AppState>().db.getKv('run_setup');
+      if (raw != null && mounted) {
+        final j = jsonDecode(raw) as Map<String, dynamic>;
+        setState(() {
+          final ty = j['type'] as String?;
+          if (ty != null && trainingTypes.contains(ty)) _type = ty;
+          _goal = GoalType.values[((j['goal'] as num?) ?? 0).toInt().clamp(0, GoalType.values.length - 1)];
+          _goalKm = ((j['km'] as num?) ?? 5).toDouble();
+          _goalMin = ((j['min'] as num?) ?? 30).toInt();
+          _autoLap = ((j['lap'] as num?) ?? 0).toDouble();
+          _autoPause = j['pause'] != false;
+          _voice = j['voice'] != false;
+        });
+      }
+    } catch (_) {}
+    _restored = true;
+  }
+
+  /// Guarda os ajustes sempre que mudam (exceto quando vieram de um treino do plano).
+  void _persist(AppState app) {
+    if (!_restored || _applied != null) return;
+    final snap = jsonEncode({
+      'type': _type,
+      'goal': _goal.index,
+      'km': _goalKm,
+      'min': _goalMin,
+      'lap': _autoLap,
+      'pause': _autoPause,
+      'voice': _voice,
+    });
+    if (snap == _savedSnap) return;
+    _savedSnap = snap;
+    app.db.setKv('run_setup', snap);
   }
 
   @override
@@ -295,6 +337,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         }
       }
     }
+    _persist(app);
     final w = app.weather;
     final sky = SkyInfo.at(now, lat: lat, lon: lon).withWeather(w);
     // Previsão do tempo (a cada 30 min, só com a tela visível).
@@ -437,7 +480,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               onTap: _askBattery,
             ),
           ],
-          const SectionTitle('Treino'),
+          const SizedBox(height: 8),
           if (_applied != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -481,7 +524,18 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 ),
               ),
             ),
-          GlassCard(
+          _SettingsFlag(
+            title: 'Treino',
+            icon: Icons.directions_run_rounded,
+            summary: [
+              _type,
+              switch (_goal) {
+                GoalType.none => 'Sem meta',
+                GoalType.distance => 'Meta ${_goalKm == _goalKm.roundToDouble() ? _goalKm.toStringAsFixed(0) : _goalKm.toStringAsFixed(1).replaceAll('.', ',')} km',
+                GoalType.time => 'Meta $_goalMin min',
+              },
+            ].join(' · '),
+            child: GlassCard(
             tint: 0.6,
             padding: EdgeInsets.zero,
             child: Column(
@@ -543,8 +597,11 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          ),
+          const SizedBox(height: 10),
           _SettingsFlag(
+            title: 'Ajustes da corrida',
+            icon: Icons.tune_rounded,
             summary: [
               _autoPause ? 'Pausa auto' : 'Sem pausa auto',
               _voice ? 'Voz a cada ${context.watch<AppState>().voiceEveryKm} km' : 'Voz desligada',
@@ -947,9 +1004,11 @@ class _CountdownState extends State<_Countdown> {
 
 /// "Ajustes da corrida" recolhível: mostra um resumo e abre ao tocar.
 class _SettingsFlag extends StatefulWidget {
+  final String title;
+  final IconData icon;
   final String summary;
   final Widget child;
-  const _SettingsFlag({required this.summary, required this.child});
+  const _SettingsFlag({required this.title, required this.icon, required this.summary, required this.child});
 
   @override
   State<_SettingsFlag> createState() => _SettingsFlagState();
@@ -966,7 +1025,7 @@ class _SettingsFlagState extends State<_SettingsFlag> {
         Semantics(
           button: true,
           expanded: _open,
-          label: 'Ajustes da corrida',
+          label: widget.title,
           child: GestureDetector(
             onTap: () => setState(() => _open = !_open),
             child: GlassCard(
@@ -982,15 +1041,15 @@ class _SettingsFlagState extends State<_SettingsFlag> {
                       color: PaceColors.mintBright.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.tune_rounded, size: 19, color: PaceColors.mintBright),
+                    child: Icon(widget.icon, size: 19, color: PaceColors.mintBright),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Ajustes da corrida',
-                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white)),
+                        Text(widget.title,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white)),
                         const SizedBox(height: 2),
                         Text(widget.summary,
                             maxLines: 1,
