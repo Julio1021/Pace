@@ -53,7 +53,23 @@ class Speech {
 /// Toca as falas gravadas (voz natural) em fila; se faltar algum trecho
 /// ou o usuário escolher uma voz do celular, usa o leitor do aparelho.
 class Speaker {
-  final _player = AudioPlayer();
+  // A sessão de áudio é ativada/desativada por nós, em volta de cada fala.
+  final _player = AudioPlayer(handleAudioSessionActivation: false, handleInterruptions: false);
+
+  /// Fala como um GPS: pede para a música "abaixar" (sem pausar) e devolve o volume no fim.
+  static const _attrs = AndroidAudioAttributes(
+    contentType: AndroidAudioContentType.speech,
+    usage: AndroidAudioUsage.assistanceNavigationGuidance,
+  );
+  static const _session = AudioSessionConfiguration(
+    avAudioSessionCategory: AVAudioSessionCategory.playback,
+    avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.duckOthers,
+    avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+    avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.notifyOthersOnDeactivation,
+    androidAudioAttributes: _attrs,
+    androidAudioFocusGainType: AndroidAudioFocusGainType.gainTransientMayDuck,
+    androidWillPauseWhenDucked: false,
+  );
   final _queue = <List<String>>[];
   Set<String> _clips = {};
   FlutterTts? _tts;
@@ -78,7 +94,8 @@ class Speaker {
     } catch (_) {}
     try {
       final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.speech());
+      await session.configure(_session);
+      await _player.setAndroidAudioAttributes(_attrs);
     } catch (_) {}
     try {
       final tts = FlutterTts();
@@ -113,8 +130,15 @@ class Speaker {
         try {
           if (_voice == VoiceService.natural && hasAll(parts)) {
             await _playClips(parts);
-          } else {
-            await _tts?.speak(parts.join(' '));
+          } else if (_tts != null) {
+            // Reserva (trecho sem gravação): também abaixa a música em vez de pausar.
+            final session = await AudioSession.instance;
+            await session.setActive(true);
+            try {
+              await _tts!.speak(parts.join(' '));
+            } finally {
+              await session.setActive(false);
+            }
           }
         } catch (_) {}
       }
@@ -125,17 +149,22 @@ class Speaker {
 
   Future<void> _playClips(List<String> parts) async {
     final session = await AudioSession.instance;
-    await session.setActive(true);
     await _player.setAudioSources(
       [for (final p in parts) AudioSource.asset('${Speech.dir}${Speech.key(p)}.mp3')],
       preload: true,
     );
     await _player.seek(Duration.zero, index: 0);
-    await _player.play();
-    await _player.processingStateStream
-        .firstWhere((s) => s == ProcessingState.completed)
-        .timeout(const Duration(seconds: 40), onTimeout: () => ProcessingState.completed);
-    await _player.stop();
-    await session.setActive(false);
+    await session.setActive(true);
+    try {
+      // play() termina quando a lista acaba (ou para); não precisa esperar outro evento.
+      unawaited(_player.play());
+      await _player.processingStateStream
+          .firstWhere((s) => s == ProcessingState.completed)
+          .timeout(const Duration(seconds: 40), onTimeout: () => ProcessingState.completed);
+      await _player.stop();
+    } finally {
+      // Devolve o foco: a música volta ao volume normal.
+      await session.setActive(false);
+    }
   }
 }

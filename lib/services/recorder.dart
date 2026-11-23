@@ -26,6 +26,9 @@ class RunConfig {
   final String type;
   final CoachStyle coachStyle;
 
+  /// Avisos de voz a cada N km.
+  final int voiceEveryKm;
+
   const RunConfig({
     this.goalType = GoalType.none,
     this.goalValue = 0,
@@ -34,6 +37,7 @@ class RunConfig {
     this.voice = true,
     this.type = 'Corrida livre',
     this.coachStyle = CoachStyle.energetic,
+    this.voiceEveryKm = 1,
   });
 }
 
@@ -46,17 +50,14 @@ class Recorder extends ChangeNotifier {
   final PaceDatabase Function() _db;
   final double Function() _weightKg;
   final CoachStyle Function() _defaultStyle;
-  final String Function() _voiceName;
 
   Recorder({
     required PaceDatabase Function() db,
     required double Function() weightKg,
     CoachStyle Function()? coachStyle,
-    String Function()? voiceName,
   })  : _db = db,
         _weightKg = weightKg,
-        _defaultStyle = coachStyle ?? (() => CoachStyle.energetic),
-        _voiceName = voiceName ?? (() => VoiceService.auto) {
+        _defaultStyle = coachStyle ?? (() => CoachStyle.energetic) {
     RunNotification.onAction = (a) {
       if (a != 'toggle') return;
       if (state == RecState.running) {
@@ -480,8 +481,10 @@ class Recorder extends ChangeNotifier {
       final km = splits.length;
       final prev = splits.length > 1 ? splits.sublist(0, splits.length - 1) : const <Split>[];
       final avgPrev = prev.isEmpty ? null : prev.fold<double>(0, (t, x) => t + x.sec) / prev.length;
-      final msg = _coach.onKm(km, moving, splitSec: sec, avgPrevSec: avgPrev);
-      if (config.voice) {
+      final every = config.voiceEveryKm < 1 ? 1 : config.voiceEveryKm;
+      final announce = km % every == 0;
+      final msg = announce ? _coach.onKm(km, moving, splitSec: sec, avgPrevSec: avgPrev, every: every) : null;
+      if (config.voice && announce) {
         _say([
           Speech.kmCount(km),
           'Tempo',
@@ -575,7 +578,7 @@ class Recorder extends ChangeNotifier {
 
   // ---------------- Voz ----------------
 
-  Future<void> _initTts() => _speaker.init(_voiceName());
+  Future<void> _initTts() => _speaker.init(VoiceService.natural);
 
   void _say(List<String?> parts, {bool force = false}) {
     if (!config.voice && !force) return;

@@ -156,12 +156,13 @@ class Coach {
 
   /// Ao completar o km [km]. [splitSec] é o tempo deste km e [avgPrevSec] a
   /// média dos kms anteriores (nulo no 1º km).
-  String? onKm(int km, double mov, {required double splitSec, double? avgPrevSec}) {
+  /// [every]: avisos a cada N km — com N ≥ 2 a frase vem em todo aviso.
+  String? onKm(int km, double mov, {required double splitSec, double? avgPrevSec, int every = 1}) {
     if (_lastKmSpoken == km) return null;
     String? p;
-    if (km == 1) {
+    if (km == every) {
       p = _pick(CoachMoment.firstKm, mov);
-    } else if (!hasGoal && km.isOdd) {
+    } else if (!hasGoal && (every > 1 || km.isOdd)) {
       final faster = avgPrevSec != null && splitSec < avgPrevSec * 0.97;
       p = _pick(faster ? CoachMoment.faster : CoachMoment.everyFewKm, mov);
     }

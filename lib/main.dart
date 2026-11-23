@@ -16,7 +16,6 @@ Future<void> main() async {
     db: () => state.db,
     weightKg: () => state.profile.weightForCalc,
     coachStyle: () => state.coachStyle,
-    voiceName: () => state.voiceName,
   );
   runApp(MultiProvider(
     providers: [

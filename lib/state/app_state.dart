@@ -38,8 +38,8 @@ class AppState extends ChangeNotifier {
   /// Estilo das mensagens durante a corrida.
   CoachStyle coachStyle = CoachStyle.energetic;
 
-  /// Voz das falas ('' = feminina automática).
-  String voiceName = '';
+  /// Avisos de voz a cada N km (1, 2, 3 ou 5).
+  int voiceEveryKm = 1;
   bool showIntroNow = false;
 
   /// Melhores esforços por corrida: {id: {metros: segundos}}.
@@ -67,7 +67,7 @@ class AppState extends ChangeNotifier {
       activities = await db.listActivities();
       introEnabled = (await db.getKv('intro_enabled')) != '0';
       coachStyle = CoachStyleX.parse(await db.getKv('coach_style'));
-      voiceName = await db.getKv('tts_voice') ?? '';
+      voiceEveryKm = int.tryParse(await db.getKv('voice_every_km') ?? '') ?? 1;
       await _loadExtras();
       final last = await db.getKv('intro_last_day');
       final open = await db.listActivities(status: ActivityStatus.inProgress);
@@ -257,10 +257,10 @@ class AppState extends ChangeNotifier {
     await db.setKv('intro_last_day', _dayKey(DateTime.now()));
   }
 
-  Future<void> setVoiceName(String v) async {
-    voiceName = v;
+  Future<void> setVoiceEveryKm(int v) async {
+    voiceEveryKm = v;
     notifyListeners();
-    await db.setKv('tts_voice', v);
+    await db.setKv('voice_every_km', '$v');
   }
 
   Future<void> setCoachStyle(CoachStyle s) async {

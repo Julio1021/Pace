@@ -18,6 +18,7 @@ import '../widgets/common.dart';
 import '../widgets/guara.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/sky_scene.dart';
+import '../widgets/voice_every.dart';
 import 'live_run_screen.dart';
 
 /// Preparação da corrida: permissões, sinal de GPS e opções.
@@ -227,6 +228,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         voice: _voice,
         type: _type,
         coachStyle: context.read<AppState>().coachStyle,
+        voiceEveryKm: context.read<AppState>().voiceEveryKm,
       );
       context.read<AppState>().clearPreset();
       _applied = null;
@@ -559,11 +561,20 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 const Divider(height: 1),
                 SwitchListTile(
                   secondary: const Icon(Icons.record_voice_over_outlined),
-                  title: const Text('Aviso por voz a cada km'),
-                  subtitle: const Text('Tempo, distância e pace do km'),
+                  title: const Text('Avisos por voz'),
+                  subtitle: const Text('Tempo, distância, pace e incentivo'),
                   value: _voice,
                   onChanged: (v) => setState(() => _voice = v),
                 ),
+                if (_voice)
+                  Builder(builder: (context) {
+                    final app = context.watch<AppState>();
+                    return ListTile(
+                      leading: const Icon(Icons.straighten_rounded),
+                      title: const Text('Avisar a cada'),
+                      trailing: VoiceEveryPicker(value: app.voiceEveryKm, onChanged: app.setVoiceEveryKm),
+                    );
+                  }),
               ],
             ),
           ),

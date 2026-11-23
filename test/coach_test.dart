@@ -49,4 +49,11 @@ void main() {
     expect(c.onProgress(0.8, 1000), isNotNull); // 75%
     expect(c.onProgress(0.81, 1100), isNull); // 25 e 50% já marcados
   });
+
+  test('avisos a cada 2 km: frase no 1º aviso e em todos os seguintes', () {
+    final c = Coach(style: CoachStyle.energetic, random: math.Random(4));
+    expect(c.onKm(2, 700, splitSec: 350, every: 2), isNotNull);
+    expect(c.onKm(4, 1400, splitSec: 350, avgPrevSec: 350, every: 2), isNotNull);
+    expect(c.onKm(6, 2100, splitSec: 350, avgPrevSec: 350, every: 2), isNotNull);
+  });
 }

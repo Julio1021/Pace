@@ -19,7 +19,7 @@ import 'plans_screen.dart';
 import 'records_screen.dart';
 import 'reminders_screen.dart';
 import '../widgets/goals_card.dart';
-import 'voice_picker.dart';
+import '../widgets/voice_every.dart';
 import 'profile_edit_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -253,19 +253,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.record_voice_over_outlined),
-                  title: const Text('Voz das falas'),
-                  subtitle: Text(app.voiceName.isEmpty
-                      ? 'Francisca (natural)'
-                      : app.voiceName == 'auto'
-                          ? 'Feminina do celular'
-                          : 'Voz do celular escolhida'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    showDragHandle: true,
-                    builder: (_) => const VoicePickerSheet(),
-                  ),
+                  title: const Text('Avisos de voz'),
+                  subtitle: Text(app.voiceEveryKm == 1 ? 'A cada km, com a voz da Francisca' : 'A cada ${app.voiceEveryKm} km, com a voz da Francisca'),
+                  trailing: VoiceEveryPicker(value: app.voiceEveryKm, onChanged: app.setVoiceEveryKm),
                 ),
                 const Divider(height: 1),
                 for (final s in CoachStyle.values)
