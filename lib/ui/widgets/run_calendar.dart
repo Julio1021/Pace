@@ -81,7 +81,10 @@ class _RunCalendarState extends State<RunCalendar> {
                 children: [
                   IconButton(
                     tooltip: 'Mês anterior',
-                    onPressed: canBack ? () => setState(() => (_month, _day) = (DateTime(_month.year, _month.month - 1), null)) : null,
+                    onPressed: canBack ? () => setState(() {
+                              _month = DateTime(_month.year, _month.month - 1);
+                              _day = null;
+                            }) : null,
                     icon: const Icon(Icons.chevron_left_rounded),
                   ),
                   Expanded(
@@ -99,7 +102,10 @@ class _RunCalendarState extends State<RunCalendar> {
                   ),
                   IconButton(
                     tooltip: 'Próximo mês',
-                    onPressed: canFwd ? () => setState(() => (_month, _day) = (next, null)) : null,
+                    onPressed: canFwd ? () => setState(() {
+                              _month = next;
+                              _day = null;
+                            }) : null,
                     icon: const Icon(Icons.chevron_right_rounded),
                   ),
                 ],
