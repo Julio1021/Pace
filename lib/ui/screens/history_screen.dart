@@ -7,17 +7,22 @@ import '../../domain/models.dart';
 import '../../domain/stats.dart';
 import '../../state/app_state.dart';
 import '../shell.dart';
-import '../widgets/activity_tile.dart';
 import '../widgets/common.dart';
 import '../widgets/guara.dart';
+import '../widgets/pace_ui.dart';
+import '../widgets/route_widgets.dart';
 import '../widgets/run_calendar.dart';
 import 'activity_detail_screen.dart';
 import 'import_screen.dart';
 
-enum _Period { all, d30, d90, m12, year }
-
 enum _Dist { all, upTo5, from5to10, from10to21, over21 }
 
+enum _Source { all, recorded, imported }
+
+enum _Sort { recent, oldest, longest, fastest, longestTime }
+
+/// Histórico: busca, filtros (período, ano, mês, distância, tipo, origem), ordenação,
+/// lista agrupada por mês e calendário.
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -26,17 +31,17 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  _Period _period = _Period.all;
+  /// 'all', 'd30', 'd90', 'm12' ou 'y2025'.
+  String _period = 'all';
+  int? _month; // 1..12 dentro do ano escolhido
   _Dist _dist = _Dist.all;
+  String? _type;
+  _Source _source = _Source.all;
+  _Sort _sort = _Sort.recent;
+  String _query = '';
   bool _calendar = false;
-
-  static const _periodLabels = {
-    _Period.all: 'Todo o período',
-    _Period.d30: '30 dias',
-    _Period.d90: '90 dias',
-    _Period.m12: '12 meses',
-    _Period.year: 'Este ano',
-  };
+  bool _searching = false;
+  final _search = TextEditingController();
 
   static const _distLabels = {
     _Dist.all: 'Qualquer distância',
@@ -45,16 +50,57 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _Dist.from10to21: '10 a 21 km',
     _Dist.over21: 'Acima de 21 km',
   };
+  static const _sourceLabels = {_Source.all: 'Todas', _Source.recorded: 'Gravadas no PACE', _Source.imported: 'Importadas'};
+  static const _sortLabels = {
+    _Sort.recent: 'Mais recentes',
+    _Sort.oldest: 'Mais antigas',
+    _Sort.longest: 'Mais longas',
+    _Sort.longestTime: 'Mais tempo',
+    _Sort.fastest: 'Mais rápidas (pace)',
+  };
+  static const _months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  int? get _year => _period.startsWith('y') ? int.tryParse(_period.substring(1)) : null;
+
+  String get _periodLabel => switch (_period) {
+        'all' => 'Todo o período',
+        'd30' => 'Últimos 30 dias',
+        'd90' => 'Últimos 90 dias',
+        'm12' => 'Últimos 12 meses',
+        _ => _month == null ? '$_year' : '${_months[_month! - 1]}/$_year',
+      };
+
+  int get _activeFilters =>
+      (_period != 'all' ? 1 : 0) + (_dist != _Dist.all ? 1 : 0) + (_type != null ? 1 : 0) + (_source != _Source.all ? 1 : 0) + (_query.isNotEmpty ? 1 : 0);
+
+  void _clear() => setState(() {
+        _period = 'all';
+        _month = null;
+        _dist = _Dist.all;
+        _type = null;
+        _source = _Source.all;
+        _query = '';
+        _search.clear();
+        _searching = false;
+      });
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   bool _matches(Activity a, DateTime now) {
     final l = a.start.toLocal();
+    final y = _year;
     final okPeriod = switch (_period) {
-      _Period.all => true,
-      _Period.d30 => l.isAfter(now.subtract(const Duration(days: 30))),
-      _Period.d90 => l.isAfter(now.subtract(const Duration(days: 90))),
-      _Period.m12 => l.isAfter(DateTime(now.year - 1, now.month, now.day)),
-      _Period.year => l.year == now.year,
+      'all' => true,
+      'd30' => l.isAfter(now.subtract(const Duration(days: 30))),
+      'd90' => l.isAfter(now.subtract(const Duration(days: 90))),
+      'm12' => l.isAfter(DateTime(now.year - 1, now.month, now.day)),
+      _ => l.year == y && (_month == null || l.month == _month),
     };
+    if (!okPeriod) return false;
     final km = a.distanceM / 1000;
     final okDist = switch (_dist) {
       _Dist.all => true,
@@ -63,212 +109,471 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _Dist.from10to21 => km >= 10 && km < 21,
       _Dist.over21 => km >= 21,
     };
-    return okPeriod && okDist;
+    if (!okDist) return false;
+    if (_type != null && a.type != _type) return false;
+    if (_source == _Source.recorded && a.source != ActivitySource.recorded) return false;
+    if (_source == _Source.imported && a.source == ActivitySource.recorded) return false;
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      final hay = '${a.type} ${a.notes} ${Fmt.date(a.start)} ${Fmt.weekdayDate(a.start)} ${Fmt.km(a.distanceM)}'.toLowerCase();
+      if (!hay.contains(q)) return false;
+    }
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
     final now = DateTime.now();
     final list = app.activities.where((a) => _matches(a, now)).toList();
+    switch (_sort) {
+      case _Sort.recent:
+        break;
+      case _Sort.oldest:
+        list.sort((a, b) => a.start.compareTo(b.start));
+      case _Sort.longest:
+        list.sort((a, b) => b.distanceM.compareTo(a.distanceM));
+      case _Sort.longestTime:
+        list.sort((a, b) => b.movingSec.compareTo(a.movingSec));
+      case _Sort.fastest:
+        list.removeWhere((a) => a.distanceM < 1000 || a.paceSecPerKm == null);
+        list.sort((a, b) => a.paceSecPerKm!.compareTo(b.paceSecPerKm!));
+    }
     final total = PeriodStats.of(list);
+    final years = {for (final a in app.activities) a.start.toLocal().year}.toList()..sort((a, b) => b.compareTo(a));
+    final types = {for (final a in app.activities) a.type}.toList()..sort();
+    final byDate = _sort == _Sort.recent || _sort == _Sort.oldest;
+    final recordIds = {for (final r in app.records.list) if (r.activityId != null) r.activityId!};
 
-    // Agrupa por mês (lista já vem do mais recente para o mais antigo).
-    final rows = <Object>[];
-    DateTime? curMonth;
-    final monthTotals = <DateTime, PeriodStats>{};
-    final byMonth = <DateTime, List<Activity>>{};
-    for (final a in list) {
-      final m = Periods.monthStart(a.start.toLocal());
-      byMonth.putIfAbsent(m, () => []).add(a);
-    }
-    byMonth.forEach((k, v) => monthTotals[k] = PeriodStats.of(v));
-    for (final a in list) {
-      final m = Periods.monthStart(a.start.toLocal());
-      if (m != curMonth) {
-        rows.add(m);
-        curMonth = m;
+    // Grupos: por mês quando ordenado por data; senão, ranking em blocos de 20.
+    final groups = <({String title, String sub, List<Activity> items})>[];
+    if (byDate) {
+      DateTime? cur;
+      for (final a in list) {
+        final m = Periods.monthStart(a.start.toLocal());
+        if (m != cur) {
+          groups.add((title: Fmt.monthYear(m), sub: '', items: []));
+          cur = m;
+        }
+        groups.last.items.add(a);
       }
-      rows.add(a);
+    } else {
+      for (var i = 0; i < list.length; i += 20) {
+        groups.add((title: i == 0 ? _sortLabels[_sort]! : '', sub: '', items: list.sublist(i, (i + 20).clamp(0, list.length))));
+      }
     }
+
+    void open(Activity a) => Navigator.push(context, MaterialPageRoute(builder: (_) => ActivityDetailScreen(activityId: a.id!)));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Histórico'),
-        actions: [
-          if (app.activities.isNotEmpty)
-            IconButton(
-              tooltip: _calendar ? 'Ver em lista' : 'Ver calendário',
-              icon: Icon(_calendar ? Icons.view_list_rounded : Icons.calendar_month_rounded),
-              onPressed: () => setState(() => _calendar = !_calendar),
-            ),
-          IconButton(
-            tooltip: 'Importar histórico',
-            icon: const Icon(Icons.upload_file),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
-          ),
-        ],
-      ),
-      body: app.activities.isEmpty
-          ? Center(
-              child: SingleChildScrollView(
-                child: EmptyState(
-                  icon: Icons.history,
-                  art: const Guara(pose: GuaraPose.run, size: 150),
-                  title: 'Nenhuma corrida ainda',
-                  message: 'As corridas gravadas e importadas aparecem aqui, organizadas por mês.',
-                  actions: [
-                    FilledButton.icon(
-                      onPressed: () => HomeShell.of(context)?.go(2),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Correr agora'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
-                      icon: const Icon(Icons.upload_file),
-                      label: const Text('Importar .tcx / .gpx'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : _calendar
-              ? ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 130),
-                  children: [RunCalendar(activities: app.activities)],
-                )
-              : CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    child: Row(
-                      children: [
-                        Expanded(child: _FilterButton<_Period>(
-                          icon: Icons.calendar_month,
-                          value: _period,
-                          labels: _periodLabels,
-                          onChanged: (v) => setState(() => _period = v),
-                        )),
-                        const SizedBox(width: 8),
-                        Expanded(child: _FilterButton<_Dist>(
-                          icon: Icons.straighten,
-                          value: _dist,
-                          labels: _distLabels,
-                          onChanged: (v) => setState(() => _dist = v),
-                        )),
-                      ],
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [PaceColors.mint, PaceColors.mintDark],
-                        ),
-                        boxShadow: [BoxShadow(color: PaceColors.mint.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
-                      ),
-                      child: Row(
-                        children: [
-                          for (final e in [
-                            (Fmt.integer(total.count), total.count == 1 ? 'corrida' : 'corridas'),
-                            (Fmt.integer(total.distanceM / 1000), 'km'),
-                            (Fmt.durationLong(total.movingSec), 'tempo'),
-                          ])
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: numStyle(24, color: Colors.white))),
-                                  Text(e.$2, style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
-                                ],
-                              ),
-                            ),
+      body: Stack(
+        children: [
+          const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 520)),
+          SafeArea(
+            bottom: false,
+            child: app.activities.isEmpty
+                ? Center(
+                    child: SingleChildScrollView(
+                      child: EmptyState(
+                        icon: Icons.history,
+                        art: const Guara(pose: GuaraPose.run, size: 150),
+                        title: 'Nenhuma corrida ainda',
+                        message: 'As corridas gravadas e importadas aparecem aqui, organizadas por mês.',
+                        actions: [
+                          FilledButton.icon(
+                            onPressed: () => HomeShell.of(context)?.go(2),
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Correr agora'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Importar .tcx / .gpx'),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ),
-                if (list.isEmpty)
-                  SliverToBoxAdapter(
-                    child: EmptyState(
-                      icon: Icons.filter_alt_off,
-                      art: const Guara(pose: GuaraPose.sleep, size: 110),
-                      title: 'Nada com esses filtros',
-                      message: 'Mude o período ou a faixa de distância.',
-                    ),
-                  ),
-                SliverList.builder(
-                  itemCount: rows.length,
-                  itemBuilder: (context, i) {
-                    final r = rows[i];
-                    if (r is DateTime) {
-                      final s = monthTotals[r]!;
-                      return Container(
-                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-                        child: Row(
-                          children: [
-                            Expanded(child: Text(Fmt.monthYear(r), style: numStyle(18, color: cs.onSurface))),
-                            Text('${Fmt.kmUnit(s.distanceM, decimals: 1)} · ${s.count} '
-                                '${s.count == 1 ? 'corrida' : 'corridas'}',
-                                style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                          ],
+                  )
+                : CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
+                          child: ScreenTitle(
+                            'Histórico',
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!_calendar)
+                                  IconButton(
+                                    tooltip: 'Buscar',
+                                    icon: Icon(_searching ? Icons.search_off_rounded : Icons.search_rounded),
+                                    onPressed: () => setState(() {
+                                      _searching = !_searching;
+                                      if (!_searching) {
+                                        _query = '';
+                                        _search.clear();
+                                      }
+                                    }),
+                                  ),
+                                IconButton(
+                                  tooltip: _calendar ? 'Ver em lista' : 'Ver calendário',
+                                  icon: Icon(_calendar ? Icons.view_list_rounded : Icons.calendar_month_rounded),
+                                  onPressed: () => setState(() => _calendar = !_calendar),
+                                ),
+                                IconButton(
+                                  tooltip: 'Importar histórico',
+                                  icon: const Icon(Icons.upload_file),
+                                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      );
-                    }
-                    final a = r as Activity;
-                    return ActivityListTile(
-                      activity: a,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ActivityDetailScreen(activityId: a.id!)),
                       ),
-                    );
-                  },
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 130)),
-              ],
-            ),
+                      if (_calendar)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 130),
+                          sliver: SliverToBoxAdapter(child: RunCalendar(activities: app.activities)),
+                        )
+                      else ...[
+                        if (_searching)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: TextField(
+                                controller: _search,
+                                autofocus: true,
+                                onChanged: (v) => setState(() => _query = v.trim()),
+                                decoration: InputDecoration(
+                                  hintText: 'Buscar por data, tipo ou observação',
+                                  prefixIcon: const Icon(Icons.search_rounded),
+                                  filled: true,
+                                  fillColor: Colors.white.withValues(alpha: 0.9),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            child: Row(
+                              children: [
+                                _MenuChip<String>(
+                                  icon: Icons.event_rounded,
+                                  label: _periodLabel,
+                                  active: _period != 'all',
+                                  items: [
+                                    ('all', 'Todo o período'),
+                                    ('d30', 'Últimos 30 dias'),
+                                    ('d90', 'Últimos 90 dias'),
+                                    ('m12', 'Últimos 12 meses'),
+                                    for (final y in years) ('y$y', 'Ano de $y'),
+                                  ],
+                                  onPick: (v) => setState(() {
+                                    _period = v;
+                                    _month = null;
+                                  }),
+                                ),
+                                if (_year != null)
+                                  _MenuChip<int>(
+                                    icon: Icons.calendar_view_month_rounded,
+                                    label: _month == null ? 'Todos os meses' : _months[_month! - 1],
+                                    active: _month != null,
+                                    items: [
+                                      (0, 'Todos os meses'),
+                                      for (var m = 1; m <= 12; m++)
+                                        if (app.activities.any((a) {
+                                          final l = a.start.toLocal();
+                                          return l.year == _year && l.month == m;
+                                        }))
+                                          (m, _months[m - 1]),
+                                    ],
+                                    onPick: (v) => setState(() => _month = v == 0 ? null : v),
+                                  ),
+                                _MenuChip<_Dist>(
+                                  icon: Icons.straighten_rounded,
+                                  label: _distLabels[_dist]!,
+                                  active: _dist != _Dist.all,
+                                  items: [for (final e in _distLabels.entries) (e.key, e.value)],
+                                  onPick: (v) => setState(() => _dist = v),
+                                ),
+                                if (types.length > 1)
+                                  _MenuChip<String>(
+                                    icon: Icons.category_outlined,
+                                    label: _type ?? 'Todos os tipos',
+                                    active: _type != null,
+                                    items: [('', 'Todos os tipos'), for (final t in types) (t, t)],
+                                    onPick: (v) => setState(() => _type = v.isEmpty ? null : v),
+                                  ),
+                                _MenuChip<_Source>(
+                                  icon: Icons.source_outlined,
+                                  label: _sourceLabels[_source]!,
+                                  active: _source != _Source.all,
+                                  items: [for (final e in _sourceLabels.entries) (e.key, e.value)],
+                                  onPick: (v) => setState(() => _source = v),
+                                ),
+                                _MenuChip<_Sort>(
+                                  icon: Icons.swap_vert_rounded,
+                                  label: _sortLabels[_sort]!,
+                                  active: _sort != _Sort.recent,
+                                  items: [for (final e in _sortLabels.entries) (e.key, e.value)],
+                                  onPick: (v) => setState(() => _sort = v),
+                                ),
+                                if (_activeFilters > 0)
+                                  TextButton.icon(
+                                    onPressed: _clear,
+                                    icon: const Icon(Icons.close_rounded, size: 18),
+                                    label: const Text('Limpar'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                            child: _Summary(total: total),
+                          ),
+                        ),
+                        if (list.isEmpty)
+                          SliverToBoxAdapter(
+                            child: EmptyState(
+                              icon: Icons.filter_alt_off,
+                              art: const Guara(pose: GuaraPose.sleep, size: 110),
+                              title: 'Nada encontrado',
+                              message: 'Nenhuma corrida com esses filtros.',
+                              actions: [OutlinedButton(onPressed: _clear, child: const Text('Limpar filtros'))],
+                            ),
+                          ),
+                        SliverList.builder(
+                          itemCount: groups.length,
+                          itemBuilder: (context, gi) {
+                            final g = groups[gi];
+                            final st = byDate ? PeriodStats.of(g.items) : null;
+                            final offset = byDate ? 0 : gi * 20;
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (g.title.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+                                      child: Row(
+                                        children: [
+                                          Expanded(child: Text(g.title, style: numStyle(17, color: Pal.of(context).ink))),
+                                          if (st != null)
+                                            Text(
+                                              '${Fmt.kmUnit(st.distanceM, decimals: 1)} · ${st.count} ${st.count == 1 ? 'corrida' : 'corridas'}',
+                                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Pal.of(context).muted),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  GlassCard(
+                                    radius: 22,
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Column(
+                                      children: [
+                                        for (final (i, a) in g.items.indexed) ...[
+                                          if (i > 0) Divider(height: 1, indent: 76, color: Colors.white.withValues(alpha: 0.07)),
+                                          _RunRow(
+                                            a: a,
+                                            rank: byDate ? null : offset + i + 1,
+                                            record: recordIds.contains(a.id),
+                                            onTap: () => open(a),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 130)),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _FilterButton<T> extends StatelessWidget {
-  final IconData icon;
-  final T value;
-  final Map<T, String> labels;
-  final ValueChanged<T> onChanged;
-
-  const _FilterButton({required this.icon, required this.value, required this.labels, required this.onChanged});
+/// Resumo do que está filtrado.
+class _Summary extends StatelessWidget {
+  final PeriodStats total;
+  const _Summary({required this.total});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return PopupMenuButton<T>(
-      initialValue: value,
-      onSelected: onChanged,
-      itemBuilder: (_) => [
-        for (final e in labels.entries) PopupMenuItem(value: e.key, child: Text(e.value)),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
+    final items = [
+      (Fmt.integer(total.count), total.count == 1 ? 'corrida' : 'corridas'),
+      (Fmt.km(total.distanceM, decimals: total.distanceM >= 1000000 ? 0 : 1), 'km'),
+      (Fmt.durationLong(total.movingSec), 'tempo'),
+      (Fmt.pace(total.avgPace), 'pace médio'),
+    ];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [PaceColors.mintBright, PaceColors.mint, PaceColors.mintDark],
+        ),
+        boxShadow: [BoxShadow(color: PaceColors.mint.withValues(alpha: 0.3), blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: Row(
+        children: [
+          for (final (i, e) in items.indexed) ...[
+            if (i > 0) Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.25)),
+            Expanded(
+              child: Column(
+                children: [
+                  FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: numStyle(20, color: Colors.white))),
+                  const SizedBox(height: 2),
+                  Text(e.$2, style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Uma corrida na lista (sobre o vidro escuro).
+class _RunRow extends StatelessWidget {
+  final Activity a;
+  final int? rank;
+  final bool record;
+  final VoidCallback onTap;
+  const _RunRow({required this.a, required this.onTap, this.rank, this.record = false});
+
+  @override
+  Widget build(BuildContext context) {
+    const p = Pal(true);
+    final l = a.start.toLocal();
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: cs.primary),
-            const SizedBox(width: 6),
-            Expanded(child: Text(labels[value]!, maxLines: 1, overflow: TextOverflow.ellipsis)),
-            Icon(Icons.arrow_drop_down, color: cs.onSurfaceVariant),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                RouteThumbnail(points: a.previewPoints, size: 50, strokeWidth: 2, color: PaceColors.mintBright),
+                if (rank != null)
+                  Positioned(
+                    left: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(color: PaceColors.mintBright, borderRadius: BorderRadius.circular(8)),
+                      child: Text('$rank', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: PaceColors.ink)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text.rich(TextSpan(children: [
+                        TextSpan(text: Fmt.km(a.distanceM), style: numStyle(18, color: Colors.white)),
+                        TextSpan(text: ' km', style: TextStyle(fontSize: 12, color: p.muted, fontWeight: FontWeight.w700)),
+                      ])),
+                      if (record) ...[
+                        const SizedBox(width: 6),
+                        const Tooltip(
+                          message: 'Detém um recorde',
+                          child: Icon(Icons.emoji_events_rounded, size: 15, color: Color(0xFFFFC53D)),
+                        ),
+                      ],
+                      if (a.source != ActivitySource.recorded) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.file_download_outlined, size: 14, color: p.muted),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${Fmt.weekdayShort(l)}, ${Fmt.dayMonth(l)}${rank != null ? '/${l.year}' : ''} · ${Fmt.time(a.start)} · ${a.type}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: p.muted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(Fmt.duration(a.movingSec), style: numStyle(15, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text('${Fmt.pace(a.paceSecPerKm)} /km', style: TextStyle(fontSize: 12, color: p.muted, fontWeight: FontWeight.w600)),
+              ],
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Filtro em forma de pílula que abre um menu.
+class _MenuChip<T> extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final List<(T, String)> items;
+  final ValueChanged<T> onPick;
+  const _MenuChip({required this.icon, required this.label, required this.active, required this.items, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: PopupMenuButton<T>(
+        tooltip: label,
+        onSelected: onPick,
+        itemBuilder: (_) => [for (final (v, t) in items) PopupMenuItem(value: v, child: Text(t))],
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+          decoration: BoxDecoration(
+            color: active ? PaceColors.ink : Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: active ? PaceColors.ink : const Color(0x140F172A)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: active ? PaceColors.mintBright : PaceColors.mintDark),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: active ? Colors.white : PaceColors.ink,
+                  )),
+              Icon(Icons.arrow_drop_down_rounded, size: 20, color: active ? Colors.white70 : PaceColors.muted),
+            ],
+          ),
         ),
       ),
     );

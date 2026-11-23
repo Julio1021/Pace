@@ -23,6 +23,7 @@ import 'package:pace/ui/screens/activity_detail_screen.dart';
 import 'package:pace/domain/achievements.dart';
 import 'package:pace/domain/plans.dart';
 import 'package:pace/ui/widgets/achievement_widgets.dart';
+import 'package:pace/ui/widgets/share_card.dart';
 import 'package:pace/ui/screens/home_screen.dart';
 import 'package:pace/ui/screens/reminders_screen.dart';
 import 'package:pace/ui/screens/records_screen.dart';
@@ -366,6 +367,27 @@ void main() {
       ),
     ));
     await _shot(tester, '29-medalhas', height: 1650);
+  }, skip: !_enabled);
+
+  testWidgets('30 compartilhar e anos', (tester) async {
+    final env = await _makeEnv(tester);
+    final a = env.app.activities.firstWhere((x) => x.previewPoints.length > 5);
+    for (final st in ShareStyle.values) {
+      await tester.pumpWidget(_wrap(env, ShareRunScreen(activity: a, highlight: 'Novo recorde: 5 km')));
+      await _settle(tester);
+      if (st != ShareStyle.night) {
+        await tester.tap(find.text(st.label));
+        await _settle(tester);
+      }
+      await _shot(tester, '30-compartilhar-${st.name}', height: 844);
+    }
+    await tester.pumpWidget(_wrap(env, const HomeShell()));
+    await _settle(tester);
+    await _tab(tester, 'Evolução');
+    await tester.scrollUntilVisible(find.text('Tudo'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Tudo'));
+    await _settle(tester);
+    await _shot(tester, '31-evolucao-tudo', height: 1500);
   }, skip: !_enabled);
 
   testWidgets('12 início vazio', (tester) async {

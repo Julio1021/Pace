@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart' hide Split;
-import 'package:flutter/rendering.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -15,6 +13,7 @@ import '../../domain/calc.dart';
 import '../../domain/records.dart';
 import '../widgets/achievement_widgets.dart';
 import 'achievements_screen.dart';
+import '../widgets/share_card.dart';
 import 'records_screen.dart';
 import '../../domain/coach.dart';
 import '../../domain/models.dart';
@@ -38,7 +37,6 @@ class ActivityDetailScreen extends StatefulWidget {
 class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   ActivityBundle? _b;
   bool _loading = true;
-  final _shareKey = GlobalKey();
   late final TextEditingController _notes;
 
   @override
@@ -129,47 +127,42 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     ));
   }
 
-  Future<void> _shareImage() async {
-    final b = _b!;
-    await showDialog<void>(
+  void _shareImage() {
+    final app = context.read<AppState>();
+    String? highlight;
+    if (app.efforts.containsKey(widget.activityId)) {
+      for (final b in Records.brokenBy(widget.activityId, app.activities, app.efforts)) {
+        if (b.before != null) {
+          highlight = 'Novo recorde: ${b.now.label}';
+          break;
+        }
+      }
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ShareRunScreen(activity: _b!.activity, highlight: highlight)));
+  }
+
+  Future<void> _editNotes() async {
+    final a = _b!.activity;
+    _notes.text = a.notes;
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => Dialog(
-        insetPadding: const EdgeInsets.all(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RepaintBoundary(key: _shareKey, child: ShareCard(activity: b.activity)),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(c), child: const Text('Fechar'))),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.share),
-                      label: const Text('Compartilhar'),
-                      onPressed: () async {
-                        final boundary = _shareKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-                        if (boundary == null) return;
-                        final img = await boundary.toImage(pixelRatio: 3);
-                        final data = await img.toByteData(format: ui.ImageByteFormat.png);
-                        if (data == null) return;
-                        final dir = await getTemporaryDirectory();
-                        final f = File('${dir.path}/${exportFileName(b.activity, 'png')}');
-                        await f.writeAsBytes(data.buffer.asUint8List());
-                        await SharePlus.instance.share(ShareParams(files: [XFile(f.path, mimeType: 'image/png')]));
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+      builder: (c) => AlertDialog(
+        title: const Text('Observações'),
+        content: TextField(
+          controller: _notes,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 8,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Como se sentiu, clima, tênis, percurso…'),
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Salvar')),
+        ],
       ),
     );
+    if (ok == true) await _saveNotes();
   }
 
   @override
@@ -188,8 +181,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final best = a.bestKmSec;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(widget.justFinished ? 'Corrida salva' : a.type),
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        title: Text(widget.justFinished ? 'Corrida salva' : 'Corrida'),
         actions: [
           IconButton(tooltip: 'Compartilhar imagem', icon: const Icon(Icons.ios_share), onPressed: _shareImage),
           PopupMenuButton<String>(
@@ -211,8 +208,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
+      body: Stack(
+        children: [
+          const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 640)),
+          ListView(
+        padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + kToolbarHeight + 4, 16, 40),
         children: [
           if (widget.justFinished)
             Padding(
@@ -239,17 +239,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                 ),
               ),
             ),
-          _Highlights(activityId: a.id!, fresh: widget.justFinished),
-          Text('${Fmt.weekdayDate(a.start)} · ${Fmt.time(a.start)}',
-              style: t.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 4),
-          Text(Fmt.kmUnit(a.distanceM), style: numStyle(46, color: cs.onSurface)),
+          _Hero(activity: a, route: route),
           const SizedBox(height: 12),
-          if (route.length >= 2)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: SizedBox(height: 300, child: RouteMap(points: route)),
-            ),
+          _Highlights(activityId: a.id!, fresh: widget.justFinished),
           if (a.gpsPartial) ...[
             const SizedBox(height: 10),
             _Notice(
@@ -337,24 +329,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   onTap: _pickType,
                 ),
                 const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _notes,
-                    minLines: 2,
-                    maxLines: 6,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: 'Observações',
-                      hintText: 'Como se sentiu, clima, tênis…',
-                      suffixIcon: IconButton(icon: const Icon(Icons.check), tooltip: 'Salvar', onPressed: _saveNotes),
-                    ),
-                    onEditingComplete: _saveNotes,
-                    onTapOutside: (_) {
-                      FocusScope.of(context).unfocus();
-                      _saveNotes();
-                    },
-                  ),
+                ListTile(
+                  leading: const Icon(Icons.edit_note_rounded),
+                  title: const Text('Observações'),
+                  subtitle: Text(a.notes.isEmpty ? 'Toque para anotar como foi' : a.notes),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _editNotes,
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -365,6 +345,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               ],
             ),
           ),
+        ],
+      ),
         ],
       ),
     );
@@ -482,72 +464,6 @@ class _SplitsTable extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Resumo visual para compartilhar (distância, tempo, pace e trajeto).
-class ShareCard extends StatelessWidget {
-  final Activity activity;
-  const ShareCard({super.key, required this.activity});
-
-  @override
-  Widget build(BuildContext context) {
-    final a = activity;
-    const white = Colors.white;
-    return Container(
-      width: 320,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [PaceColors.blue, PaceColors.blueDark],
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.directions_run, color: PaceColors.lime),
-              const SizedBox(width: 6),
-              const Text('PACE', style: TextStyle(color: white, fontWeight: FontWeight.w900, letterSpacing: 3)),
-              const Spacer(),
-              Text(Fmt.date(a.start), style: TextStyle(color: white.withValues(alpha: 0.8), fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (a.previewPoints.length >= 2)
-            SizedBox(
-              height: 160,
-              width: double.infinity,
-              child: CustomPaint(painter: RoutePainter(a.previewPoints, PaceColors.lime, 4)),
-            ),
-          const SizedBox(height: 10),
-          Text('${Fmt.km(a.distanceM)} km',
-              style: const TextStyle(color: white, fontSize: 40, fontWeight: FontWeight.w900, height: 1)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _item('Tempo', Fmt.duration(a.movingSec)),
-              _item('Pace', '${Fmt.pace(a.paceSecPerKm)} /km'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _item(String label, String value) => Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
-          ],
-        ),
-      );
 }
 
 /// Recordes e conquistas desta corrida (com destaque quando acabou de terminar).
@@ -688,6 +604,103 @@ class _Highlights extends StatelessWidget {
             ),
           ),
           Text(value, style: numStyle(16, color: Colors.white)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Topo do detalhe: mapa (ou o Guará), tipo, data e a distância em destaque.
+class _Hero extends StatelessWidget {
+  final Activity activity;
+  final List<LatLng> route;
+  const _Hero({required this.activity, required this.route});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = activity;
+    const p = Pal(true);
+    final hasMap = route.length >= 2;
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasMap)
+            SizedBox(
+              height: 250,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  RouteMap(points: route),
+                  // Degradê para o mapa "entrar" no vidro.
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 60,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x00121720), Color(0xE6121720)],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(18, hasMap ? 4 : 18, 18, 18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          Pill(
+                            text: a.type,
+                            bg: PaceColors.mintBright.withValues(alpha: 0.16),
+                            fg: PaceColors.mintBright,
+                            icon: Icons.directions_run_rounded,
+                          ),
+                          if (a.source != ActivitySource.recorded)
+                            Pill(
+                              text: 'Importada',
+                              bg: Colors.white.withValues(alpha: 0.08),
+                              fg: p.muted,
+                              icon: Icons.file_download_outlined,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text('${Fmt.weekdayDate(a.start)} · ${Fmt.time(a.start)}',
+                          style: TextStyle(color: p.muted, fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text.rich(TextSpan(children: [
+                          TextSpan(text: Fmt.km(a.distanceM), style: numStyle(52, color: Colors.white)),
+                          TextSpan(text: ' km', style: numStyle(22, color: p.muted)),
+                        ])),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!hasMap) const Guara(pose: GuaraPose.run, size: 96),
+              ],
+            ),
+          ),
         ],
       ),
     );

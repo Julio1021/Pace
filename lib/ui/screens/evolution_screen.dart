@@ -15,7 +15,7 @@ import 'achievements_screen.dart';
 import 'plans_screen.dart';
 import 'records_screen.dart';
 
-enum EvoPeriod { d7, d30, d90, m12, all }
+enum EvoPeriod { d7, d30, d90, m12, year, all }
 
 class EvolutionScreen extends StatefulWidget {
   const EvolutionScreen({super.key});
@@ -26,12 +26,14 @@ class EvolutionScreen extends StatefulWidget {
 
 class _EvolutionScreenState extends State<EvolutionScreen> {
   EvoPeriod _p = EvoPeriod.d30;
+  int _year = DateTime.now().year;
 
   static const _labels = {
     EvoPeriod.d7: '7 dias',
     EvoPeriod.d30: '30 dias',
     EvoPeriod.d90: '90 dias',
     EvoPeriod.m12: '12 meses',
+    EvoPeriod.year: 'Ano',
     EvoPeriod.all: 'Tudo',
   };
 
@@ -45,6 +47,8 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     final end = today.add(const Duration(days: 1));
 
     DateTime start;
+    var stop = end;
+    DateTime? prevStart;
     Bucket bucket;
     switch (_p) {
       case EvoPeriod.d7:
@@ -59,15 +63,28 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
       case EvoPeriod.m12:
         start = DateTime(now.year - 1, now.month + 1);
         bucket = Bucket.month;
+      case EvoPeriod.year:
+        start = DateTime(_year);
+        final yEnd = DateTime(_year + 1);
+        stop = yEnd.isBefore(end) ? yEnd : end;
+        prevStart = DateTime(_year - 1);
+        bucket = Bucket.month;
       case EvoPeriod.all:
         final first = app.firstRunDate?.toLocal() ?? today;
-        start = DateTime(first.year, first.month);
-        bucket = Bucket.month;
+        // Muitos anos: um ponto por ano; senão, por mês.
+        final months = (now.year - first.year) * 12 + now.month - first.month + 1;
+        bucket = months > 30 ? Bucket.year : Bucket.month;
+        start = bucket == Bucket.year ? DateTime(first.year) : DateTime(first.year, first.month);
     }
-    final span = end.difference(start);
-    final cur = PeriodStats.of(Periods.between(app.activities, start, end));
-    final prev = _p == EvoPeriod.all ? null : PeriodStats.of(Periods.between(app.activities, start.subtract(span), start));
-    final buckets = kmBuckets(app.activities, start, end, bucket);
+    final span = stop.difference(start);
+    final cur = PeriodStats.of(Periods.between(app.activities, start, stop));
+    final prev = _p == EvoPeriod.all
+        ? null
+        : _p == EvoPeriod.year
+            // Ano anterior até o mesmo dia (comparação justa no ano em curso).
+            ? PeriodStats.of(Periods.between(app.activities, prevStart!, DateTime(_year - 1, stop.month, stop.day)))
+            : PeriodStats.of(Periods.between(app.activities, start.subtract(span), start));
+    final buckets = kmBuckets(app.activities, start, bucket == Bucket.month && _p == EvoPeriod.year ? DateTime(_year + 1) : stop, bucket);
     final chartData = [
       for (final b in buckets)
         (
@@ -75,6 +92,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
             Bucket.day => Fmt.weekdayShort(b.start),
             Bucket.week => Fmt.dayMonth(b.start),
             Bucket.month => buckets.length > 14 ? '${Fmt.monthShort(b.start)}/${b.start.year % 100}' : Fmt.monthShort(b.start),
+            Bucket.year => '${b.start.year}',
           },
           km: b.km,
         ),
@@ -112,11 +130,21 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                       for (final e in _labels.entries)
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(e.value),
-                            selected: _p == e.key,
-                            onSelected: (_) => setState(() => _p = e.key),
-                          ),
+                          child: e.key == EvoPeriod.year
+                              ? _YearChip(
+                                  years: _years(app),
+                                  selected: _p == EvoPeriod.year,
+                                  year: _year,
+                                  onPick: (y) => setState(() {
+                                    _p = EvoPeriod.year;
+                                    _year = y;
+                                  }),
+                                )
+                              : ChoiceChip(
+                                  label: Text(e.value),
+                                  selected: _p == e.key,
+                                  onSelected: (_) => setState(() => _p = e.key),
+                                ),
                         ),
                     ],
                   ),
@@ -134,7 +162,17 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                           if (prev != null) ChangeBadge(ratio: Periods.change(cur.distanceM, prev.distanceM)),
                         ],
                       ),
-                      Text('${Fmt.km(cur.distanceM, decimals: 1)} km', style: numStyle(40, color: cs.onSurface)),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text.rich(TextSpan(children: [
+                          TextSpan(
+                            text: Fmt.km(cur.distanceM, decimals: cur.distanceM >= 1000000 ? 0 : 1),
+                            style: numStyle(40, color: cs.onSurface),
+                          ),
+                          TextSpan(text: ' km', style: numStyle(22, color: cs.onSurfaceVariant)),
+                        ])),
+                      ),
                       if (prev != null)
                         Text(
                           'Período anterior equivalente: ${Fmt.kmUnit(prev.distanceM, decimals: 1)}',
@@ -149,6 +187,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                             Bucket.day => 'km por dia',
                             Bucket.week => 'km por semana (início na segunda)',
                             Bucket.month => 'km por mês',
+                            Bucket.year => 'km por ano',
                           },
                           style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
@@ -206,8 +245,10 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                 if (prev != null) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Comparação com os ${_labels[_p]} anteriores (${Fmt.dayMonth(start.subtract(span))} a '
-                    '${Fmt.dayMonth(start.subtract(const Duration(days: 1)))}).',
+                    _p == EvoPeriod.year
+                        ? 'Comparação com ${_year - 1}${stop.year == _year ? ' até o mesmo dia' : ''}.'
+                        : 'Comparação com os ${_labels[_p]} anteriores (${Fmt.dayMonth(start.subtract(span))} a '
+                            '${Fmt.dayMonth(start.subtract(const Duration(days: 1)))}).',
                     style: const TextStyle(fontSize: 12, color: PaceColors.muted),
                   ),
                 ],
@@ -225,6 +266,11 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
         ],
       ),
     );
+  }
+
+  static List<int> _years(AppState app) {
+    final s = {DateTime.now().year, for (final a in app.activities) a.start.toLocal().year}.toList()..sort((a, b) => b.compareTo(a));
+    return s;
   }
 
   static Map<DateTime, double> _kmByDay(AppState app) {
@@ -322,6 +368,34 @@ class _Shortcuts extends StatelessWidget {
             plan?.plan == null ? 'Escolher' : '${plan!.done.length}/${plan.plan!.sessions.length}',
             plan?.plan == null ? 'de treino' : plan!.plan!.name, const PlansScreen()),
       ],
+    );
+  }
+}
+
+/// Chip "Ano" que abre a lista de anos com corridas.
+class _YearChip extends StatelessWidget {
+  final List<int> years;
+  final bool selected;
+  final int year;
+  final ValueChanged<int> onPick;
+  const _YearChip({required this.years, required this.selected, required this.year, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<int>(
+      tooltip: 'Escolher ano',
+      onSelected: onPick,
+      itemBuilder: (_) => [for (final y in years) CheckedPopupMenuItem(value: y, checked: selected && y == year, child: Text('$y'))],
+      child: IgnorePointer(
+        child: ChoiceChip(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [Text(selected ? '$year' : 'Ano'), const Icon(Icons.arrow_drop_down, size: 18)],
+          ),
+          selected: selected,
+          onSelected: (_) {},
+        ),
+      ),
     );
   }
 }

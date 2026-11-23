@@ -22,7 +22,7 @@ class KmBarChart extends StatelessWidget {
     // Escala com 4 divisões "redondas" (ex.: 0, 5, 10, 15, 20).
     final step = maxKm <= 0 ? 1.25 : _niceCeil(maxKm * 1.1 / 4);
     final top = step * 4;
-    final barW = data.length > 20 ? 7.0 : (data.length > 10 ? 12.0 : 24.0);
+    final barW = data.length > 40 ? 3.5 : data.length > 20 ? 7.0 : (data.length > 10 ? 12.0 : 24.0);
     final pal = Pal.of(context);
     return SizedBox(
       height: height,
@@ -59,7 +59,10 @@ class KmBarChart extends StatelessWidget {
                 getTitlesWidget: (v, meta) {
                   final i = v.toInt();
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                  if (i % labelEvery != 0 && i != data.length - 1) return const SizedBox.shrink();
+                  // Rótulos espaçados por igual; o último só se não colar no anterior.
+                  final last = data.length - 1;
+                  final show = i % labelEvery == 0 ? (i == last || last - i >= labelEvery ~/ 2 + 1 || labelEvery == 1) : (i == last && last % labelEvery >= (labelEvery / 2).ceil());
+                  if (!show) return const SizedBox.shrink();
                   return SideTitleWidget(
                     meta: meta,
                     child: Text(data[i].label, style: TextStyle(fontSize: 10, color: muted)),
@@ -85,7 +88,12 @@ class KmBarChart extends StatelessWidget {
                   BarChartRodData(
                     toY: data[i].km,
                     width: barW,
-                    color: (highlightIndex == null || i == highlightIndex) ? pal.mint : pal.mintMid,
+                    // Sem barra (nem "pontinho") quando não houve corrida.
+                    color: data[i].km <= 0
+                        ? Colors.transparent
+                        : (highlightIndex == null || i == highlightIndex)
+                            ? pal.mint
+                            : pal.mintMid,
                     borderRadius: BorderRadius.circular(barW / 2.4),
                   ),
                 ],

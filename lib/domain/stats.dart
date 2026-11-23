@@ -89,7 +89,7 @@ class Periods {
   }
 }
 
-enum Bucket { day, week, month }
+enum Bucket { day, week, month, year }
 
 /// Quilometragem somada por dia, semana ou mês, de [fromLocal] até [toLocal] (exclusivo).
 List<({DateTime start, double km})> kmBuckets(
@@ -102,11 +102,13 @@ List<({DateTime start, double km})> kmBuckets(
         Bucket.day => Periods.dayStart(d),
         Bucket.week => Periods.weekStart(d),
         Bucket.month => Periods.monthStart(d),
+        Bucket.year => DateTime(d.year),
       };
   DateTime next(DateTime d) => switch (bucket) {
         Bucket.day => DateTime(d.year, d.month, d.day + 1),
         Bucket.week => DateTime(d.year, d.month, d.day + 7),
         Bucket.month => DateTime(d.year, d.month + 1),
+        Bucket.year => DateTime(d.year + 1),
       };
   final sums = <DateTime, double>{};
   for (final a in Periods.between(list, fromLocal, toLocal)) {

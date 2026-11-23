@@ -2,14 +2,15 @@ import 'package:intl/intl.dart';
 
 /// Formatação padrão do app: pt-BR, sistema métrico, 24 h.
 class Fmt {
-  static final _d1 = NumberFormat('0.0', 'pt_BR');
-  static final _d2 = NumberFormat('0.00', 'pt_BR');
+  static final _d0 = NumberFormat('#,##0', 'pt_BR');
+  static final _d1 = NumberFormat('#,##0.0', 'pt_BR');
+  static final _d2 = NumberFormat('#,##0.00', 'pt_BR');
   static final _int = NumberFormat.decimalPattern('pt_BR');
 
   /// Distância em km com duas casas: "13,03".
   static String km(double meters, {int decimals = 2}) {
     final v = meters / 1000;
-    return decimals == 1 ? _d1.format(v) : _d2.format(v);
+    return switch (decimals) { 0 => _d0.format(v), 1 => _d1.format(v), _ => _d2.format(v) };
   }
 
   static String kmUnit(double meters, {int decimals = 2}) => '${km(meters, decimals: decimals)} km';
