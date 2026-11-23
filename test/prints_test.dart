@@ -20,7 +20,12 @@ import 'package:pace/services/recorder.dart';
 import 'package:pace/state/app_state.dart';
 import 'package:pace/ui/intro_overlay.dart';
 import 'package:pace/ui/screens/activity_detail_screen.dart';
+import 'package:pace/domain/plans.dart';
 import 'package:pace/ui/screens/home_screen.dart';
+import 'package:pace/ui/screens/reminders_screen.dart';
+import 'package:pace/ui/screens/records_screen.dart';
+import 'package:pace/ui/screens/plans_screen.dart';
+import 'package:pace/ui/screens/achievements_screen.dart';
 import 'package:pace/ui/screens/import_screen.dart';
 import 'package:pace/ui/screens/live_run_screen.dart';
 import 'package:pace/ui/screens/profile_edit_screen.dart';
@@ -285,6 +290,38 @@ void main() {
     final id = env.app.activities.first.id!;
     await tester.pumpWidget(_wrap(env, ActivityDetailScreen(activityId: id, justFinished: true)));
     await _shot(tester, '03-corrida-salva', height: 1200);
+  }, skip: !_enabled);
+
+  testWidgets('20 etapa 2', (tester) async {
+    final env = await _makeEnv(tester);
+    await tester.runAsync(() async {
+      await env.app.saveProfile(env.app.profile.copyWith(monthlyGoalKm: 80, yearlyGoalKm: 1000));
+      await env.app.startPlan('rumo10k', DateTime.now().subtract(const Duration(days: 9)));
+      await env.app.afterChange();
+    });
+    final shots = <String, (Widget, double)>{
+      '20-recordes': (const RecordsScreen(), 1200),
+      '21-conquistas': (const AchievementsScreen(), 2300),
+      '22-planos': (const PlansScreen(), 1100),
+      '23-plano-detalhe': (PlanDetailScreen(plan: TrainingPlan.byId('rumo10k')!), 1500),
+      '24-lembretes': (const RemindersScreen(), 1000),
+    };
+    for (final e in shots.entries) {
+      await tester.pumpWidget(_wrap(env, e.value.$1));
+      await _settle(tester);
+      await _shot(tester, e.key, height: e.value.$2);
+    }
+    await tester.pumpWidget(_wrap(env, const HomeShell()));
+    await _settle(tester);
+    await _shot(tester, '25-inicio-com-plano', height: 1300);
+    await _tab(tester, 'Evolução');
+    await _shot(tester, '26-evolucao-metas', height: 1300);
+    await _tab(tester, 'Histórico');
+    await tester.tap(find.byTooltip('Ver calendário'));
+    await _settle(tester);
+    await _shot(tester, '27-calendario', height: 1100);
+    await _tab(tester, 'Perfil');
+    await _shot(tester, '28-perfil', height: 2200);
   }, skip: !_enabled);
 
   testWidgets('12 início vazio', (tester) async {

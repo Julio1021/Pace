@@ -251,7 +251,6 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     }
 
     final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
     if (rec.isActive) {
       return Scaffold(
         body: SafeArea(
