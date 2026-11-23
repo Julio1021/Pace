@@ -435,4 +435,47 @@ void main() {
     await tester.pumpWidget(_wrap(env, const ImportScreen()));
     await _shot(tester, '11-importar');
   }, skip: !_enabled);
+
+  testWidgets('40 pedal', (tester) async {
+    final env = await _makeEnv(tester);
+    await tester.runAsync(() async {
+      final now = DateTime.now();
+      for (final d in [1, 4]) {
+        final start = DateTime.utc(now.year, now.month, now.day, 7).subtract(Duration(days: d));
+        final gpx = syntheticGpx(startUtc: start, distanceM: d == 1 ? 32400 : 21000, baseSpeed: 7.2)
+            .replaceFirst('<trk><trkseg>', '<trk><type>cycling</type><trkseg>');
+        await ImportService.run(env.app.db, [ImportItem('pedal_$d.gpx', utf8.encode(gpx))], weightKg: 74);
+      }
+      await env.app.reload();
+      await env.app.setSport(Sport.bike);
+    });
+    await tester.pumpWidget(_wrap(env, const HomeShell()));
+    await _settle(tester);
+    await _tab(tester, 'Correr');
+    await _shot(tester, '40-pedal-preparar', height: 1000);
+    await tester.ensureVisible(find.text('Ajustes do pedal'));
+    await tester.tap(find.text('Ajustes do pedal'));
+    await _settle(tester);
+    await _shot(tester, '41-pedal-ajustes', height: 1400);
+    await _tab(tester, 'Histórico');
+    await _shot(tester, '42-historico-com-pedal', height: 1100);
+    final ride = env.app.rides.first;
+    await tester.pumpWidget(_wrap(env, ActivityDetailScreen(activityId: ride.id!)));
+    await _shot(tester, '43-pedal-detalhe', height: 2400);
+    await tester.pumpWidget(_wrap(env, const RecordsScreen()));
+    await _shot(tester, '44-recordes-pedal', height: 1500);
+    late ActivityBundle b;
+    await tester.runAsync(() async => b = (await env.app.db.getBundle(ride.id!))!);
+    final rec = env.rec
+      ..config = const RunConfig(sport: Sport.bike, type: 'Pedal longo')
+      ..state = RecState.running
+      ..startTime = DateTime.now().toUtc().subtract(const Duration(minutes: 49))
+      ..distance = 18420
+      ..moving = 2830
+      ..maxKmh = 38.6;
+    rec.points.addAll(b.points.where((p) => p.dist <= 18420));
+    await tester.pumpWidget(_wrap(env, const LiveRunScreen()));
+    await _shot(tester, '45-pedalando');
+    rec.state = RecState.idle;
+  }, skip: !_enabled);
 }
