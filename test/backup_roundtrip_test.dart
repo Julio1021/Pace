@@ -4,6 +4,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pace/data/exporters.dart';
 import 'package:pace/data/import_service.dart';
+import 'package:pace/data/importers.dart';
 import 'package:pace/domain/models.dart';
 
 import 'helpers.dart';
