@@ -548,8 +548,19 @@ class _ScenePainter extends CustomPainter {
       }
       // Nuvens de chuva: base mais escura.
       if (info.rain > 0) {
-        canvas.drawRect(Rect.fromLTWH(0, 0, w, horizon * 0.55),
-            Paint()..color = const Color(0xFF2B3442).withValues(alpha: 0.10 + 0.08 * info.rain));
+        final r = Rect.fromLTWH(0, 0, w, horizon * 0.7);
+        canvas.drawRect(
+          r,
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF2B3442).withValues(alpha: 0.14 + 0.1 * info.rain),
+                const Color(0xFF2B3442).withValues(alpha: 0),
+              ],
+            ).createShader(r),
+        );
       }
     }
 

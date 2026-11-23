@@ -483,9 +483,12 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             padding: EdgeInsets.zero,
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 0, 4),
-                  child: Text('Tipo de treino', style: glassTheme.textTheme.titleSmall),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 0, 4),
+                    child: Text('Tipo de treino', style: glassTheme.textTheme.titleSmall),
+                  ),
                 ),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,

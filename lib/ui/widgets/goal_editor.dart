@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
-import 'pace_ui.dart';
 
 /// Editor da meta: número grande editável (toque para digitar), botões − e +
 /// redondos (segurar repete) e atalhos rápidos.
