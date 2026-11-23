@@ -55,6 +55,43 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   bool _starting = false;
   RunPreset? _applied;
   bool _restored = false;
+
+  // Posições medidas para descer o botão e os cards e alinhar os morros.
+  final _topKey = GlobalKey();
+  final _btnKey = GlobalKey();
+  final _bottomKey = GlobalKey();
+  double _gapTop = 22;
+  double _gapBottom = 18;
+  double? _btnCenter;
+
+  void _measure() {
+    if (!mounted || (_scroll.hasClients && _scroll.offset > 0)) return;
+    final top = _topKey.currentContext?.findRenderObject() as RenderBox?;
+    final btn = _btnKey.currentContext?.findRenderObject() as RenderBox?;
+    final bottom = _bottomKey.currentContext?.findRenderObject() as RenderBox?;
+    if (top == null || btn == null || bottom == null || !top.hasSize || !btn.hasSize || !bottom.hasSize) return;
+    final mq = MediaQuery.of(context);
+    final screenH = mq.size.height;
+    final topEnd = top.localToGlobal(Offset(0, top.size.height)).dy;
+    final btnH = btn.size.height;
+    final bottomH = bottom.size.height;
+    // Botão perto do meio da tela; cards logo acima da barra de navegação.
+    final navTop = screenH - 112;
+    var wantTop = math.max(22.0, screenH * 0.5 - btnH / 2 - topEnd);
+    var wantBottom = navTop - (topEnd + wantTop + btnH) - bottomH;
+    if (wantBottom < 18) {
+      wantTop = math.max(22.0, wantTop + wantBottom - 18);
+      wantBottom = 18;
+    }
+    final center = topEnd + wantTop + btnH / 2;
+    if ((wantTop - _gapTop).abs() > 1 || (wantBottom - _gapBottom).abs() > 1 || _btnCenter == null || (center - _btnCenter!).abs() > 1) {
+      setState(() {
+        _gapTop = wantTop;
+        _gapBottom = wantBottom;
+        _btnCenter = center;
+      });
+    }
+  }
   String? _savedSnap;
   final _scroll = ScrollController();
   final _scrollPos = ValueNotifier<double>(0);
@@ -363,7 +400,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     final base = Theme.of(context);
     final mq = MediaQuery.of(context);
     // Os morros ficam logo abaixo do botão Iniciar.
-    final horizon = mq.padding.top + 290;
+    // Os morros ficam um pouco acima do centro do botão (ele "pousa" na paisagem).
+    final horizon = (_btnCenter ?? mq.padding.top + 264) - 4;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
     return Scaffold(
       backgroundColor: sky.look.ground,
       body: Stack(
@@ -380,7 +419,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               ),
               child: ListView(
         controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 130),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
         children: [
           Appear(
             child: Row(
@@ -411,6 +450,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           ),
           const SizedBox(height: 10),
           Appear(
+            key: _topKey,
             delayMs: 60,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,8 +473,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               ],
             ),
           ),
-          const SizedBox(height: 22),
+          SizedBox(height: _gapTop),
           Appear(
+            key: _btnKey,
             delayMs: 120,
             child: Center(
               child: Builder(builder: (context) {
@@ -451,7 +492,11 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
               }),
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: _gapBottom),
+          Column(
+            key: _bottomKey,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           if (!_hasPermission)
             _Banner(
               icon: Icons.location_off,
@@ -676,6 +721,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             ),
           ),
           ),
+            ],
+          ),
+          const SizedBox(height: 112),
         ],
       ),
             ),

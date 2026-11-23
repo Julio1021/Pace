@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme.dart';
+import 'ui/widgets/guara_art.dart';
 import 'state/app_state.dart';
 import 'ui/intro_overlay.dart';
 import 'ui/screens/profile_edit_screen.dart';
@@ -52,24 +56,81 @@ class RootGate extends StatelessWidget {
   }
 }
 
-class SplashScreen extends StatelessWidget {
+/// Abertura enquanto o app carrega: fundo claro em degradê (igual ao Início),
+/// o Guará balançando, "PACE" e três pontinhos.
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PaceColors.blue,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.directions_run, color: Colors.white, size: 64),
-            const SizedBox(height: 12),
-            const Text('PACE',
-                style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: 6)),
-            const SizedBox(height: 4),
-            Text('Corra melhor. Vá mais longe.', style: TextStyle(color: Colors.white.withValues(alpha: 0.85))),
-          ],
+      backgroundColor: const Color(0xFFEEF3FF),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFC9F2E2), Color(0xFFEEF3FF), Color(0xFFE7DCFF)],
+            stops: [0, 0.55, 1],
+          ),
+        ),
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = _c.value;
+            return Stack(
+              children: [
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Transform.translate(
+                        offset: Offset(0, -6 * math.sin(t * 2 * math.pi).abs()),
+                        child: SvgPicture.string(GuaraArt.head, width: 120, height: 120),
+                      ),
+                      const SizedBox(height: 14),
+                      Text('PACE', style: numStyle(34, color: PaceColors.ink).copyWith(letterSpacing: 8)),
+                      const SizedBox(height: 4),
+                      const Text('Bora correr?', style: TextStyle(color: PaceColors.muted, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 72,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: PaceColors.mint.withValues(alpha: 0.25 + 0.75 * (0.5 + 0.5 * math.sin((t - i * 0.18) * 2 * math.pi))),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

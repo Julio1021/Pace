@@ -476,7 +476,7 @@ class _ScenePainter extends CustomPainter {
     final p = span <= 0 ? 0.5 : info.now.difference(sr).inSeconds / span;
     if (p > -0.04 && p < 1.04) {
       final elev = math.sin(math.pi * p.clamp(0.0, 1.0));
-      final top = 105.0;
+      final top = 92.0;
       final low = horizon + 26;
       // Perto do horizonte o sol fica mais à direita, para não sumir atrás do botão.
       final c = Offset(w * (0.8 + 0.08 * (1 - elev)), low - (low - top) * math.pow(elev, 0.75));
