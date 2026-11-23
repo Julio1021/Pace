@@ -44,7 +44,7 @@ class BadgeMedal extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _MedalRing(on ? 1 : badge.progress, on ? c : const Color(0xFF94A3B8)),
+        painter: _MedalRing(on ? 1 : badge.progress, on ? c : Color.lerp(c, const Color(0xFF94A3B8), 0.35)!),
         child: Padding(
           padding: EdgeInsets.all(size * 0.1),
           child: DecoratedBox(

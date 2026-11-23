@@ -206,7 +206,7 @@ class _RunCalendarState extends State<RunCalendar> {
                 icon: Icons.straighten_rounded,
                 color: PaceColors.mintBright,
                 value: st.count == 0 ? '—' : Fmt.km(st.distanceM / math.max(1, st.count), decimals: 1),
-                label: 'km por corrida no mês',
+                label: 'km/corrida no mês',
               ),
             ),
           ],

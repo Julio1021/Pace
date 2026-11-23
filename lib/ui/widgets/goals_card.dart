@@ -53,14 +53,14 @@ class _GoalRow extends StatelessWidget {
       hint = 'Meta batida! ${g.progress >= 1.2 ? 'E com sobra.' : ''}';
       hintColor = PaceColors.mintBright;
     } else {
-      final parts = <String>['faltam ${Fmt.km(g.leftKm * 1000, decimals: 1)} km'];
+      final parts = <String>['Faltam ${Fmt.km(g.leftKm * 1000, decimals: 1)} km'];
       final proj = g.projectedKm;
       if (g.period != GoalPeriod.week && g.neededPerWeek != null) {
-        parts.add('${Fmt.km(g.neededPerWeek! * 1000, decimals: 1)} km/semana');
+        parts.add('${Fmt.integer(g.neededPerWeek!)} km/sem.');
       }
       if (proj != null) {
-        final ok = proj >= g.targetKm;
-        parts.add('no ritmo atual: ~${Fmt.integer(proj)} km');
+        final ok = proj >= g.targetKm * 0.98;
+        parts.add('previsão ~${Fmt.integer(proj)} km');
         hintColor = ok ? PaceColors.mintBright : const Color(0xFFFFB37A);
       }
       hint = parts.join(' · ');
@@ -83,7 +83,7 @@ class _GoalRow extends StatelessWidget {
                     TextSpan(text: Fmt.km(g.doneKm * 1000, decimals: 1), style: numStyle(20, color: Colors.white)),
                     if (!off)
                       TextSpan(
-                        text: ' / ${Fmt.km(g.targetKm * 1000, decimals: g.targetKm == g.targetKm.roundToDouble() ? 0 : 1)} km',
+                        text: ' / ${Fmt.integer(g.targetKm)} km',
                         style: TextStyle(color: p.muted, fontWeight: FontWeight.w700),
                       )
                     else
