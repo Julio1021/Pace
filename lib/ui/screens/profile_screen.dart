@@ -14,6 +14,8 @@ import '../../state/app_state.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/common.dart';
 import 'achievements_screen.dart';
+import 'cloud_backup_screen.dart';
+import '../../services/pcloud.dart';
 import 'import_screen.dart';
 import 'plans_screen.dart';
 import 'records_screen.dart';
@@ -217,6 +219,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   subtitle: const Text('Arquivos .tcx, .gpx ou .zip'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportScreen())),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.cloud_sync_outlined),
+                  title: const Text('Backup no pCloud'),
+                  subtitle: Text(!PCloudService.configured
+                      ? 'Aguardando aprovação da pCloud'
+                      : app.pcloudConnected
+                          ? (app.lastCloudBackup == null ? 'Conectado' : 'Último: ${Fmt.dateTime(app.lastCloudBackup!.toUtc())}')
+                          : 'Backup automático na nuvem'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CloudBackupScreen())),
                 ),
                 const Divider(height: 1),
                 ListTile(

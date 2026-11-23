@@ -36,6 +36,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Volta do login do pCloud (pace-pcloud://oauth#access_token=...). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pace-pcloud" android:host="oauth" />
+            </intent-filter>
         </activity>
         <receiver android:name=".RunActionReceiver" android:exported="false" />
         <receiver android:name=".ReminderReceiver" android:exported="false" />

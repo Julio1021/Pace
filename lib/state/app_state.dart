@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -14,6 +15,8 @@ import '../domain/reminders.dart';
 import '../domain/stats.dart';
 import '../services/run_notification.dart';
 import '../services/weather.dart';
+import '../services/pcloud.dart';
+import '../data/exporters.dart';
 
 /// Treino do plano escolhido para a próxima corrida (preenche a tela Correr).
 class RunPreset {
@@ -56,6 +59,133 @@ class AppState extends ChangeNotifier {
   /// Lembretes agendados.
   ReminderSettings reminders = const ReminderSettings();
 
+  // ---------- Backup no pCloud ----------
+
+  PCloudService? pcloud;
+  String? pcloudEmail;
+  DateTime? lastCloudBackup;
+  int _lastCloudCount = -1;
+  bool cloudBusy = false;
+  String? cloudError;
+
+  bool get pcloudConnected => pcloud != null;
+
+  Future<void> _loadCloud() async {
+    try {
+      final raw = await db.getKv('pcloud');
+      if (raw == null || raw.isEmpty) return;
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      pcloud = PCloudService('${j['token']}', '${j['host']}');
+      pcloudEmail = j['email'] as String?;
+      final t = (j['last'] as num?)?.toInt();
+      lastCloudBackup = t == null ? null : DateTime.fromMillisecondsSinceEpoch(t);
+      _lastCloudCount = (j['count'] as num?)?.toInt() ?? -1;
+    } catch (_) {}
+  }
+
+  Future<void> _saveCloud() async {
+    final c = pcloud;
+    await db.setKv(
+      'pcloud',
+      c == null
+          ? ''
+          : jsonEncode({
+              'token': c.token,
+              'host': c.host,
+              'email': pcloudEmail,
+              'last': lastCloudBackup?.millisecondsSinceEpoch,
+              'count': _lastCloudCount,
+            }),
+    );
+  }
+
+  /// Abre o login no navegador e espera a volta para o app.
+  Future<void> connectPCloud() async {
+    cloudError = null;
+    cloudBusy = true;
+    notifyListeners();
+    try {
+      await PCloudService.startLogin();
+      final c = await PCloudService.waitForLogin();
+      pcloud = c;
+      try {
+        pcloudEmail = await c.email();
+      } catch (_) {}
+      await _saveCloud();
+      cloudBusy = false;
+      notifyListeners();
+      await backupToCloud();
+    } catch (e) {
+      cloudError = '$e';
+    } finally {
+      cloudBusy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> disconnectPCloud() async {
+    pcloud = null;
+    pcloudEmail = null;
+    lastCloudBackup = null;
+    _lastCloudCount = -1;
+    await _saveCloud();
+    notifyListeners();
+  }
+
+  /// Envia um backup agora (e mantém só os 10 mais recentes).
+  Future<bool> backupToCloud() async {
+    final c = pcloud;
+    if (c == null || cloudBusy) return false;
+    cloudBusy = true;
+    cloudError = null;
+    notifyListeners();
+    try {
+      final bytes = Uint8List.fromList(await BackupCodec.build(db));
+      final n = DateTime.now();
+      String two(int v) => v.toString().padLeft(2, '0');
+      await c.upload('pace_backup_${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}${two(n.minute)}.zip', bytes);
+      try {
+        await c.prune();
+      } catch (_) {}
+      lastCloudBackup = n;
+      _lastCloudCount = activities.length;
+      await _saveCloud();
+      return true;
+    } catch (e) {
+      cloudError = '$e';
+      if (e is PCloudException && e.message.contains('expirou')) await disconnectPCloud();
+      return false;
+    } finally {
+      cloudBusy = false;
+      notifyListeners();
+    }
+  }
+
+  /// Automático: depois de uma corrida nova ou se passou uma semana.
+  Future<void> _autoCloudBackup() async {
+    if (pcloud == null) return;
+    final last = lastCloudBackup;
+    final changed = activities.length != _lastCloudCount;
+    final old = last == null || DateTime.now().difference(last).inDays >= 7;
+    if (changed || old) await backupToCloud();
+  }
+
+  Future<({int restored, int skipped})> restoreFromCloud(int fileId) async {
+    final c = pcloud!;
+    cloudBusy = true;
+    notifyListeners();
+    try {
+      final bytes = await c.download(fileId);
+      final r = await BackupCodec.restore(db, bytes);
+      profile = await db.getProfile();
+      await reload();
+      return r;
+    } finally {
+      cloudBusy = false;
+      notifyListeners();
+    }
+  }
+
   /// Tempo agora (para o céu da tela Correr).
   WeatherNow? weather;
   bool _weatherBusy = false;
@@ -92,6 +222,7 @@ class AppState extends ChangeNotifier {
       coachStyle = CoachStyleX.parse(await db.getKv('coach_style'));
       voiceEveryKm = int.tryParse(await db.getKv('voice_every_km') ?? '') ?? 1;
       await _loadExtras();
+      await _loadCloud();
       final last = await db.getKv('intro_last_day');
       final open = await db.listActivities(status: ActivityStatus.inProgress);
       final today = _dayKey(DateTime.now());
@@ -146,6 +277,7 @@ class AppState extends ChangeNotifier {
       if (!identical(marked, p)) await _savePlan(marked);
     }
     await rescheduleReminders();
+    await _autoCloudBackup();
   }
 
   /// Calcula (uma vez) os melhores esforços das corridas que ainda não têm.
