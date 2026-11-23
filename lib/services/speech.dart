@@ -47,6 +47,12 @@ class Speech {
     return ['${c ~/ 100} vírgula', '${(c % 100).toString().padLeft(2, '0')} quilômetros.'];
   }
 
+  /// "24 quilômetros por hora." (inteiro, de 0 a 99).
+  static String kmh(double kmh) {
+    final n = kmh.round().clamp(0, 99);
+    return '$n ${n == 1 ? 'quilômetro' : 'quilômetros'} por hora.';
+  }
+
   static String kmCount(int km) => '$km ${km == 1 ? 'quilômetro' : 'quilômetros'}.';
 }
 

@@ -58,6 +58,19 @@ class Fmt {
     return _d1.format(mps * 3.6);
   }
 
+  /// Velocidade já em km/h, com uma casa.
+  static String kmh(double? kmh) {
+    if (kmh == null || !kmh.isFinite || kmh <= 0) return '—';
+    return _d1.format(kmh);
+  }
+
+  /// Ritmo ou velocidade, conforme a modalidade: "5:12 /km" ou "24,6 km/h".
+  static String effort(double? secPerKm, {required bool bike}) {
+    if (!bike) return paceUnit(secPerKm);
+    if (secPerKm == null || secPerKm <= 0) return '—';
+    return '${kmh(3600 / secPerKm)} km/h';
+  }
+
   static String date(DateTime utc) => DateFormat('dd/MM/yyyy').format(utc.toLocal());
   static String time(DateTime utc) => DateFormat('HH:mm').format(utc.toLocal());
   static String dateTime(DateTime utc) => DateFormat("dd/MM/yyyy 'às' HH:mm").format(utc.toLocal());

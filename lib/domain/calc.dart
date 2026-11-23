@@ -20,6 +20,25 @@ class Calc {
   /// Calorias estimadas: 1,0 kcal × peso (kg) × distância (km).
   static double calories(double weightKg, double distanceM) => weightKg * distanceM / 1000;
 
+  /// Calorias no pedal (MET pela velocidade média × peso × horas em movimento).
+  static double bikeCalories(double weightKg, double distanceM, double movingSec) {
+    if (movingSec <= 0) return 0;
+    final kmh = distanceM / movingSec * 3.6;
+    final met = kmh < 16
+        ? 4.0
+        : kmh < 19
+            ? 6.8
+            : kmh < 22
+                ? 8.0
+                : kmh < 25
+                    ? 10.0
+                    : 12.0;
+    return met * weightKg * movingSec / 3600;
+  }
+
+  static double caloriesFor(Sport s, double weightKg, double distanceM, double movingSec) =>
+      s == Sport.bike ? bikeCalories(weightKg, distanceM, movingSec) : calories(weightKg, distanceM);
+
   /// Pace (s/km) a partir de segundos e metros. Nulo se a distância for pequena demais.
   static double? pace(double seconds, double meters) {
     if (meters < 10 || seconds <= 0) return null;
@@ -102,7 +121,7 @@ class Calc {
   /// Recalcula distância e tempo em movimento acumulados de uma trilha importada.
   /// Trechos com velocidade impossível (> 12 m/s) não somam distância e
   /// intervalos maiores que 2 min não somam tempo.
-  static List<TrackPoint> accumulate(List<TrackPoint> pts) {
+  static List<TrackPoint> accumulate(List<TrackPoint> pts, {double maxSpeed = 12}) {
     if (pts.isEmpty) return pts;
     final out = <TrackPoint>[pts.first.withProgress(0, 0)];
     var dist = 0.0;
@@ -113,7 +132,7 @@ class Calc {
       final dt = b.time.difference(a.time).inMilliseconds / 1000.0;
       final d = haversine(a.lat, a.lon, b.lat, b.lon);
       if (dt > 0 && dt <= 120) {
-        if (d / dt <= 12) dist += d;
+        if (d / dt <= maxSpeed) dist += d;
         mov += dt;
       }
       out.add(b.withProgress(dist, mov));
@@ -138,7 +157,7 @@ class Calc {
 
   /// Série de pace (s/km) ao longo da distância (km), em janelas de 30 s de movimento,
   /// com uma amostra a cada [stepM] metros. Valores fora de 2:00–20:00/km são descartados.
-  static List<({double km, double pace})> paceSeries(List<TrackPoint> pts, {double stepM = 100}) {
+  static List<({double km, double pace})> paceSeries(List<TrackPoint> pts, {double stepM = 100, double minPace = 120}) {
     final out = <({double km, double pace})>[];
     if (pts.length < 3) return out;
     var next = stepM;
@@ -152,7 +171,7 @@ class Calc {
       }
       final a = pts[j == i ? i - 1 : j];
       final p = pace(b.mov - a.mov, b.dist - a.dist);
-      if (p != null && p >= 120 && p <= 1200) out.add((km: b.dist / 1000, pace: p));
+      if (p != null && p >= minPace && p <= 1200) out.add((km: b.dist / 1000, pace: p));
     }
     return out;
   }
@@ -206,6 +225,7 @@ class GpsFilter {
     required double lon,
     required DateTime time,
     TrackPoint? lastAccepted,
+    double maxSpeed = maxSpeedMps,
   }) {
     if (accuracy > maxInputAccuracyM || !accuracy.isFinite) return GpsVerdict.badAccuracy;
     final last = lastAccepted;
@@ -213,7 +233,7 @@ class GpsFilter {
     final d = Calc.haversine(last.lat, last.lon, lat, lon);
     final dt = time.difference(last.time).inMilliseconds / 1000.0;
     if (dt <= 0) return GpsVerdict.tooClose;
-    if (d / dt > maxSpeedMps) return GpsVerdict.impossibleJump;
+    if (d / dt > maxSpeed) return GpsVerdict.impossibleJump;
     // Parado, o GPS "passeia" alguns metros; o mínimo cresce com a imprecisão.
     if (d < math.max(minMoveM, accuracy * 0.4)) return GpsVerdict.tooClose;
     return GpsVerdict.accept;
@@ -234,6 +254,8 @@ class GpsFilter {
 class GpsSmoother {
   /// Quanto a posição pode mudar por segundo (m/s) — corrida rápida, com folga.
   static const q = 3.0;
+  final double qq;
+  GpsSmoother({this.qq = q});
   double? _lat, _lon;
   double _var = -1;
   DateTime? _t;
@@ -255,7 +277,7 @@ class GpsSmoother {
     }
     final dt = time.difference(_t!).inMilliseconds / 1000.0;
     if (dt > 0) {
-      _var += dt * q * q;
+      _var += dt * qq * qq;
       _t = time;
     }
     final k = _var / (_var + acc * acc);
@@ -273,21 +295,32 @@ class AutoPause {
   static const resumeAbove = 1.2;
   static const pauseAfter = Duration(seconds: 8);
 
+  /// No pedal: pausa abaixo de 1,5 m/s (≈5 km/h) por 5 s e retoma acima de 2,5 m/s.
+  double below = pauseBelow;
+  double above = resumeAbove;
+  Duration after = pauseAfter;
+
+  void setSport(Sport s) {
+    below = s == Sport.bike ? 1.5 : pauseBelow;
+    above = s == Sport.bike ? 2.5 : resumeAbove;
+    after = s == Sport.bike ? const Duration(seconds: 5) : pauseAfter;
+  }
+
   bool paused = false;
   DateTime? _slowSince;
 
   /// Atualiza com a velocidade atual e devolve se está em pausa automática.
   bool update(DateTime time, double speedMps) {
     if (paused) {
-      if (speedMps > resumeAbove) {
+      if (speedMps > above) {
         paused = false;
         _slowSince = null;
       }
       return paused;
     }
-    if (speedMps < pauseBelow) {
+    if (speedMps < below) {
       _slowSince ??= time;
-      if (time.difference(_slowSince!) >= pauseAfter) paused = true;
+      if (time.difference(_slowSince!) >= after) paused = true;
     } else {
       _slowSince = null;
     }

@@ -31,7 +31,42 @@ class RunPreset {
 class AppState extends ChangeNotifier {
   PaceDatabase? _db;
   UserProfile profile = const UserProfile();
+  /// Só as CORRIDAS (recordes, medalhas, metas, planos e lembretes usam esta lista).
   List<Activity> activities = const [];
+
+  /// Corridas e pedais juntos (histórico, início, calendário, backup).
+  List<Activity> allActivities = const [];
+
+  /// Só os pedais.
+  List<Activity> rides = const [];
+
+  /// Modalidade escolhida na tela de treino.
+  Sport sport = Sport.run;
+
+  /// Avisos de voz no pedal a cada N km.
+  int bikeVoiceEveryKm = 5;
+
+  void _setAll(List<Activity> all) {
+    allActivities = all;
+    activities = [for (final a in all) if (!a.isBike) a];
+    rides = [for (final a in all) if (a.isBike) a];
+  }
+
+  List<Activity> listFor(Sport s) => s == Sport.bike ? rides : activities;
+
+  Future<void> setSport(Sport s) async {
+    if (sport == s) return;
+    sport = s;
+    notifyListeners();
+    await db.setKv('sport', s.key);
+  }
+
+  Future<void> setBikeVoiceEveryKm(int v) async {
+    bikeVoiceEveryKm = v;
+    notifyListeners();
+    await db.setKv('bike_voice_every_km', '$v');
+  }
+
   bool ready = false;
   String? error;
 
@@ -168,7 +203,7 @@ class AppState extends ChangeNotifier {
       final n = DateTime.now();
       String two(int v) => v.toString().padLeft(2, '0');
       await c.upload(
-          'pace_backup_${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}${two(n.minute)}_${activities.length}c.zip',
+          'pace_backup_${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}${two(n.minute)}_${allActivities.length}c.zip',
           bytes);
       try {
         await c.prune();
@@ -176,7 +211,7 @@ class AppState extends ChangeNotifier {
       lastCloudBackup = n;
       lastCloudSize = bytes.length;
       cloudWaitingWifi = false;
-      _lastCloudCount = activities.length;
+      _lastCloudCount = allActivities.length;
       await _saveCloud();
       return true;
     } catch (e) {
@@ -193,7 +228,7 @@ class AppState extends ChangeNotifier {
   Future<void> _autoCloudBackup() async {
     if (pcloud == null || !cloudAuto || cloudBusy) return;
     final last = lastCloudBackup;
-    final changed = activities.length != _lastCloudCount;
+    final changed = allActivities.length != _lastCloudCount;
     final old = last == null || DateTime.now().difference(last).inDays >= 7;
     if (!changed && !old) return;
     if (cloudWifiOnly) {
@@ -256,7 +291,9 @@ class AppState extends ChangeNotifier {
     try {
       _db = database ?? await PaceDatabase.open();
       profile = await db.getProfile();
-      activities = await db.listActivities();
+      _setAll(await db.listActivities());
+      sport = SportX.parse(await db.getKv('sport'));
+      bikeVoiceEveryKm = int.tryParse(await db.getKv('bike_voice_every_km') ?? '') ?? 5;
       introEnabled = (await db.getKv('intro_enabled')) != '0';
       coachStyle = CoachStyleX.parse(await db.getKv('coach_style'));
       voiceEveryKm = int.tryParse(await db.getKv('voice_every_km') ?? '') ?? 1;
@@ -478,7 +515,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> reload() async {
-    activities = await db.listActivities();
+    _setAll(await db.listActivities());
     _cache.clear();
     notifyListeners();
     if (autoBackground) unawaited(afterChange());

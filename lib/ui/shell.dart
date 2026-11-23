@@ -117,8 +117,8 @@ class HomeShellState extends State<HomeShell> {
               backgroundColor: PaceColors.ink,
               foregroundColor: Colors.white,
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveRunScreen())),
-              icon: const Icon(Icons.directions_run),
-              label: Text('Corrida em andamento · ${Fmt.kmUnit(rec.distance)}'),
+              icon: Icon(rec.isBike ? Icons.directions_bike : Icons.directions_run),
+              label: Text('${rec.isBike ? 'Pedal' : 'Corrida'} em andamento · ${Fmt.kmUnit(rec.distance)}'),
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -213,7 +213,7 @@ class PaceNavBar extends StatelessWidget {
                 top: 0,
                 child: Semantics(
                   button: true,
-                  label: 'Correr',
+                  label: context.watch<AppState>().sport.verb,
                   child: GestureDetector(
                     key: const ValueKey('nav-2'),
                     onTap: () => onSelect(2),
@@ -227,7 +227,11 @@ class PaceNavBar extends StatelessWidget {
                         boxShadow: [BoxShadow(color: PaceColors.mint.withValues(alpha: 0.45), blurRadius: 20, offset: const Offset(0, 8))],
                       ),
                       child: Icon(
-                        index == 2 ? Icons.directions_run_rounded : Icons.play_arrow_rounded,
+                        index != 2
+                            ? Icons.play_arrow_rounded
+                            : context.watch<AppState>().sport == Sport.bike
+                                ? Icons.directions_bike_rounded
+                                : Icons.directions_run_rounded,
                         color: Colors.white,
                         size: 30,
                       ),

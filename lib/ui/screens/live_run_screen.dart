@@ -49,7 +49,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     if (rec.distance < 50) {
       final keep = await confirmDialog(
         context,
-        title: 'Corrida muito curta',
+        title: rec.isBike ? 'Pedal muito curto' : 'Corrida muito curta',
         message: 'Foram registrados só ${Fmt.integer(rec.distance)} m. Deseja salvar mesmo assim?',
         confirm: 'Salvar',
       );
@@ -68,8 +68,8 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
   Future<void> _discard() async {
     final ok = await confirmDialog(
       context,
-      title: 'Descartar corrida?',
-      message: 'Tudo o que foi gravado nesta corrida será apagado.',
+      title: context.read<Recorder>().isBike ? 'Descartar pedal?' : 'Descartar corrida?',
+      message: 'Tudo o que foi gravado neste treino será apagado.',
       confirm: 'Descartar',
       destructive: true,
     );
@@ -87,7 +87,7 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
     if (!rec.isActive && !_finishing) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Nenhuma corrida em andamento.')),
+        body: const Center(child: Text('Nenhum treino em andamento.')),
       );
     }
 
@@ -227,7 +227,10 @@ class _LiveRunScreenState extends State<LiveRunScreen> {
                     children: [
                       Expanded(child: _Mini(label: 'Tempo', value: Fmt.duration(rec.moving))),
                       Expanded(child: _Mini(label: 'km', value: Fmt.km(rec.distance))),
-                      Expanded(child: _Mini(label: 'Pace', value: Fmt.pace(rec.currentPace))),
+                      Expanded(
+                          child: rec.isBike
+                              ? _Mini(label: 'km/h', value: Fmt.kmh(rec.currentKmh))
+                              : _Mini(label: 'Pace', value: Fmt.pace(rec.currentPace))),
                     ],
                   ),
                 ),
@@ -317,11 +320,17 @@ class _Numbers extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
-              children: [
-                Expanded(child: _Mini(label: 'Pace atual', value: Fmt.pace(rec.currentPace), unit: '/km')),
-                Expanded(child: _Mini(label: 'Pace médio', value: Fmt.pace(rec.avgPace), unit: '/km')),
-                Expanded(child: _Mini(label: 'Velocidade', value: Fmt.speed(rec.avgSpeed), unit: 'km/h')),
-              ],
+              children: rec.isBike
+                  ? [
+                      Expanded(child: _Mini(label: 'Velocidade', value: Fmt.kmh(rec.currentKmh), unit: 'km/h')),
+                      Expanded(child: _Mini(label: 'Média', value: Fmt.kmh(rec.avgKmh), unit: 'km/h')),
+                      Expanded(child: _Mini(label: 'Máxima', value: Fmt.kmh(rec.maxKmh), unit: 'km/h')),
+                    ]
+                  : [
+                      Expanded(child: _Mini(label: 'Pace atual', value: Fmt.pace(rec.currentPace), unit: '/km')),
+                      Expanded(child: _Mini(label: 'Pace médio', value: Fmt.pace(rec.avgPace), unit: '/km')),
+                      Expanded(child: _Mini(label: 'Velocidade', value: Fmt.speed(rec.avgSpeed), unit: 'km/h')),
+                    ],
             ),
           ),
           Padding(

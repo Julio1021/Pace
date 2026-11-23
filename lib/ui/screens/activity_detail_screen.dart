@@ -81,7 +81,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('Tipo de treino', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             ),
-            for (final t in trainingTypes)
+            for (final t in a.sport.types)
               ListTile(
                 title: Text(t),
                 trailing: t == a.type ? const Icon(Icons.check) : null,
@@ -104,9 +104,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Future<void> _delete() async {
     final ok = await confirmDialog(
       context,
-      title: 'Excluir corrida?',
-      message: 'A corrida de ${Fmt.date(_b!.activity.start)} (${Fmt.kmUnit(_b!.activity.distanceM)}) será apagada. '
-          'Isso não pode ser desfeito.',
+      title: _b!.activity.isBike ? 'Excluir pedal?' : 'Excluir corrida?',
+      message: '${_b!.activity.isBike ? 'O pedal' : 'A corrida'} de ${Fmt.date(_b!.activity.start)} (${Fmt.kmUnit(_b!.activity.distanceM)}) será apagada. '
+          '${_b!.activity.isBike ? 'Ele será apagado' : 'Isso não pode ser desfeito'}.',
       confirm: 'Excluir',
       destructive: true,
     );
@@ -123,14 +123,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     await f.writeAsString(text);
     await SharePlus.instance.share(ShareParams(
       files: [XFile(f.path, mimeType: ext == 'gpx' ? 'application/gpx+xml' : 'application/vnd.garmin.tcx+xml')],
-      text: 'Corrida de ${Fmt.date(b.activity.start)} — ${Fmt.kmUnit(b.activity.distanceM)}',
+      text: '${b.activity.sport.label} de ${Fmt.date(b.activity.start)} — ${Fmt.kmUnit(b.activity.distanceM)}',
     ));
   }
 
   void _shareImage() {
     final app = context.read<AppState>();
     String? highlight;
-    if (app.efforts.containsKey(widget.activityId)) {
+    if (!_b!.activity.isBike && app.efforts.containsKey(widget.activityId)) {
       for (final b in Records.brokenBy(widget.activityId, app.activities, app.efforts)) {
         if (b.before != null) {
           highlight = 'Novo recorde: ${b.now.label}';
@@ -139,6 +139,27 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       }
     }
     Navigator.push(context, MaterialPageRoute(builder: (_) => ShareRunScreen(activity: _b!.activity, highlight: highlight)));
+  }
+
+  /// Corrigir a modalidade (ex.: arquivo de pedal importado como corrida).
+  Future<void> _switchSport() async {
+    final a = _b!.activity;
+    final to = a.isBike ? Sport.run : Sport.bike;
+    final ok = await confirmDialog(
+      context,
+      title: 'Mudar para ${to.label.toLowerCase()}?',
+      message: to == Sport.bike
+          ? 'Este treino passa a contar como pedal: sai dos recordes, medalhas e metas de corrida.'
+          : 'Este treino passa a contar como corrida, inclusive em recordes, medalhas e metas.',
+      confirm: 'Mudar',
+    );
+    if (!ok || !mounted) return;
+    final w = context.read<AppState>().profile.weightForCalc;
+    await _save(a.copyWith(
+      sport: to,
+      type: to.types.contains(a.type) ? a.type : to.types.first,
+      calories: Calc.caloriesFor(to, w, a.distanceM, a.movingSec.toDouble()),
+    ));
   }
 
   Future<void> _editNotes() async {
@@ -170,11 +191,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final b = _b;
     if (b == null) {
-      return Scaffold(appBar: AppBar(), body: const Center(child: Text('Corrida não encontrada.')));
+      return Scaffold(appBar: AppBar(), body: const Center(child: Text('Treino não encontrado.')));
     }
     final a = b.activity;
     final route = b.points.where((p) => !p.paused).map((p) => LatLng(p.lat, p.lon)).toList();
-    final paceData = Calc.paceSeries(b.points);
+    final bike = a.isBike;
+    final paceData = Calc.paceSeries(b.points, minPace: bike ? 40 : 120);
+    final maxKmh = bike && paceData.isNotEmpty ? 3600 / paceData.map((p) => p.pace).reduce((x, y) => x < y ? x : y) : null;
     final altData = Calc.altitudeSeries(b.points);
     final best = a.bestKmSec;
 
@@ -184,7 +207,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
-        title: Text(widget.justFinished ? 'Corrida salva' : 'Corrida'),
+        title: Text(widget.justFinished ? (bike ? 'Pedal salvo' : 'Corrida salva') : a.sport.label),
         actions: [
           IconButton(tooltip: 'Compartilhar imagem', icon: const Icon(Icons.ios_share), onPressed: _shareImage),
           PopupMenuButton<String>(
@@ -201,7 +224,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             itemBuilder: (_) => [
               if (b.points.isNotEmpty) const PopupMenuItem(value: 'gpx', child: Text('Exportar .gpx')),
               const PopupMenuItem(value: 'tcx', child: Text('Exportar .tcx')),
-              const PopupMenuItem(value: 'delete', child: Text('Excluir corrida')),
+              PopupMenuItem(value: 'delete', child: Text(bike ? 'Excluir pedal' : 'Excluir corrida')),
             ],
           ),
         ],
@@ -229,7 +252,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                               style: numStyle(20, color: Pal.of(context).ink)),
                           const SizedBox(height: 2),
                           Text('${CoachPhrases.resultLines[a.id! % CoachPhrases.resultLines.length]} '
-                              'Sua corrida foi salva no histórico.'),
+                              '${bike ? 'Seu pedal foi salvo' : 'Sua corrida foi salva'} no histórico.'),
                         ],
                       ),
                     ),
@@ -239,40 +262,57 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             ),
           _Hero(activity: a, route: route),
           const SizedBox(height: 12),
-          _Highlights(activityId: a.id!, fresh: widget.justFinished),
+          if (!bike) _Highlights(activityId: a.id!, fresh: widget.justFinished),
           if (a.gpsPartial) ...[
             const SizedBox(height: 10),
             _Notice(
               icon: Icons.gps_off,
-              text: 'Trajeto de GPS incompleto: o arquivo original cobre só parte da corrida. '
+              text: 'Trajeto de GPS incompleto: o arquivo original cobre só parte do treino. '
                   'Distância e tempo vêm do resumo da atividade; parciais por km não são exibidas.',
             ),
           ],
           if (route.length < 2 && !a.gpsPartial) ...[
             const SizedBox(height: 4),
-            _Notice(icon: Icons.map_outlined, text: 'Esta corrida não tem trajeto de GPS.'),
+            _Notice(icon: Icons.map_outlined, text: 'Este treino não tem trajeto de GPS.'),
           ],
           const SizedBox(height: 12),
           PaceCard(
             child: StatGrid(columns: 3, spacing: 18, children: [
               StatTile(label: 'Tempo', value: Fmt.duration(a.movingSec), color: const Pal(true).violet),
-              StatTile(label: 'Pace médio', value: Fmt.pace(a.paceSecPerKm), unit: '/km', color: const Pal(true).orange),
-              StatTile(label: 'Velocidade', value: Fmt.speed(a.avgSpeed), unit: 'km/h'),
-              StatTile(label: 'Melhor km', value: best == null ? '—' : Fmt.duration(best)),
+              if (bike) ...[
+                StatTile(label: 'Velocidade média', value: Fmt.kmh(a.kmh), unit: 'km/h', color: const Pal(true).orange),
+                StatTile(label: 'Velocidade máx.', value: Fmt.kmh(maxKmh), unit: 'km/h'),
+                StatTile(label: 'Descida', value: '−${Fmt.integer(a.elevLoss)}', unit: 'm'),
+              ] else ...[
+                StatTile(label: 'Pace médio', value: Fmt.pace(a.paceSecPerKm), unit: '/km', color: const Pal(true).orange),
+                StatTile(label: 'Velocidade', value: Fmt.speed(a.avgSpeed), unit: 'km/h'),
+                StatTile(label: 'Melhor km', value: best == null ? '—' : Fmt.duration(best)),
+              ],
               StatTile(label: 'Calorias (estim.)', value: a.calories == null ? '—' : Fmt.integer(a.calories!), unit: 'kcal', color: const Pal(true).pink),
               StatTile(label: 'Elevação', value: '+${Fmt.integer(a.elevGain)}', unit: 'm'),
               if (a.elapsedSec > a.movingSec + 30) StatTile(label: 'Tempo total', value: Fmt.duration(a.elapsedSec)),
               if (a.avgHr != null) StatTile(label: 'FC média', value: '${a.avgHr}', unit: 'bpm'),
               if (a.maxHr != null) StatTile(label: 'FC máxima', value: '${a.maxHr}', unit: 'bpm'),
-              if (a.avgCad != null) StatTile(label: 'Cadência', value: '${a.avgCad}', unit: 'ppm'),
+              if (a.avgCad != null) StatTile(label: 'Cadência', value: '${a.avgCad}', unit: bike ? 'rpm' : 'ppm'),
               if (b.laps.isNotEmpty) StatTile(label: 'Voltas', value: '${b.laps.length}'),
             ]),
           ),
           if (b.splits.isNotEmpty) ...[
             const SectionTitle('Parciais por km'),
-            PaceCard(padding: const EdgeInsets.symmetric(vertical: 8), child: _SplitsTable(splits: b.splits)),
+            PaceCard(padding: const EdgeInsets.symmetric(vertical: 8), child: _SplitsTable(splits: b.splits, bike: bike)),
           ],
-          if (paceData.length >= 5) ...[
+          if (paceData.length >= 5 && bike) ...[
+            const SectionTitle('Velocidade ao longo do pedal'),
+            PaceCard(
+              padding: const EdgeInsets.fromLTRB(4, 16, 16, 8),
+              child: DistanceLineChart(
+                data: [for (final p in paceData) (x: p.km, y: 3600 / p.pace)],
+                color: const Pal(true).orange,
+                formatY: (v) => '${v.round()} km/h',
+              ),
+            ),
+          ],
+          if (paceData.length >= 5 && !bike) ...[
             const SectionTitle('Pace ao longo da corrida'),
             PaceCard(
               padding: const EdgeInsets.fromLTRB(4, 16, 16, 8),
@@ -308,7 +348,7 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                       leading: CircleAvatar(radius: 14, child: Text('${l.index}', style: const TextStyle(fontSize: 12))),
                       title: Text('${Fmt.kmUnit(l.distM)} · ${Fmt.duration(l.sec)}'),
                       subtitle: Text(l.manual ? 'Volta manual' : 'Volta automática'),
-                      trailing: Text(Fmt.paceUnit(l.paceSecPerKm), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      trailing: Text(Fmt.effort(l.paceSecPerKm, bike: bike), style: const TextStyle(fontWeight: FontWeight.w700)),
                     ),
                 ],
               ),
@@ -319,6 +359,14 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             padding: EdgeInsets.zero,
             child: Column(
               children: [
+                ListTile(
+                  leading: Icon(bike ? Icons.directions_bike_rounded : Icons.directions_run_rounded),
+                  title: const Text('Modalidade'),
+                  subtitle: Text(a.sport.label),
+                  trailing: const Icon(Icons.swap_horiz_rounded),
+                  onTap: _switchSport,
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.category_outlined),
                   title: const Text('Tipo de treino'),
@@ -376,7 +424,8 @@ class _Notice extends StatelessWidget {
 
 class _SplitsTable extends StatelessWidget {
   final List<Split> splits;
-  const _SplitsTable({required this.splits});
+  final bool bike;
+  const _SplitsTable({required this.splits, this.bike = false});
 
   @override
   Widget build(BuildContext context) {
@@ -393,7 +442,7 @@ class _SplitsTable extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Row(children: [
             SizedBox(width: 44, child: header('Km')),
-            Expanded(child: header('Pace')),
+            Expanded(child: header(bike ? 'km/h' : 'Pace')),
             SizedBox(width: 64, child: header('Tempo', align: TextAlign.right)),
             SizedBox(width: 64, child: header('Dif.', align: TextAlign.right)),
           ]),
@@ -419,7 +468,7 @@ class _SplitsTable extends StatelessWidget {
                   Expanded(
                     child: Row(
                       children: [
-                        Text(Fmt.pace(pace),
+                        Text(bike ? Fmt.kmh(3600 / pace) : Fmt.pace(pace),
                             style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: isFastest ? Pal.of(context).mintText : null,
@@ -669,7 +718,7 @@ class _Hero extends StatelessWidget {
                             text: a.type,
                             bg: PaceColors.mintBright.withValues(alpha: 0.16),
                             fg: PaceColors.mintBright,
-                            icon: Icons.directions_run_rounded,
+                            icon: a.isBike ? Icons.directions_bike_rounded : Icons.directions_run_rounded,
                           ),
                           if (a.source != ActivitySource.recorded)
                             Pill(

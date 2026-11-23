@@ -29,6 +29,9 @@ class RunConfig {
   /// Avisos de voz a cada N km.
   final int voiceEveryKm;
 
+  /// Corrida ou pedal.
+  final Sport sport;
+
   const RunConfig({
     this.goalType = GoalType.none,
     this.goalValue = 0,
@@ -38,6 +41,7 @@ class RunConfig {
     this.type = 'Corrida livre',
     this.coachStyle = CoachStyle.energetic,
     this.voiceEveryKm = 1,
+    this.sport = Sport.run,
   });
 }
 
@@ -107,7 +111,7 @@ class Recorder extends ChangeNotifier {
   DateTime _lastFlush = DateTime.now();
   final _autoPause = AutoPause();
   final _paceWindow = PaceWindow();
-  final _smoother = GpsSmoother();
+  GpsSmoother _smoother = GpsSmoother();
   DateTime? _lastRawTime;
   final _speaker = Speaker();
   bool _busy = false;
@@ -118,8 +122,22 @@ class Recorder extends ChangeNotifier {
   double get elapsed => startTime == null ? 0 : DateTime.now().toUtc().difference(startTime!).inMilliseconds / 1000;
   double? get currentPace => (manuallyPaused || autoPaused) ? null : _paceWindow.current;
   double? get avgPace => Calc.pace(moving, distance);
+
+  bool get isBike => config.sport == Sport.bike;
+
+
+  /// Velocidade atual em km/h (janela de 30 s), nula parado.
+  double? get currentKmh {
+    final p = currentPace;
+    return p == null || p <= 0 ? null : 3600 / p;
+  }
+
+  double? get avgKmh => moving > 0 && distance >= 10 ? distance / moving * 3.6 : null;
   double? get avgSpeed => moving > 0 ? distance / moving : null;
-  double get calories => Calc.calories(_weightKg(), distance);
+  double get calories => Calc.caloriesFor(config.sport, _weightKg(), distance, moving);
+  /// Maior velocidade (média móvel de 30 s) em km/h.
+  double maxKmh = 0;
+
   double get lapDistance => distance - _lapStartDist;
   double get lapTime => moving - _lapStartMov;
 
@@ -130,9 +148,9 @@ class Recorder extends ChangeNotifier {
         distanceFilter: 0,
         intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'PACE — corrida em andamento',
+          notificationTitle: 'PACE — treino em andamento',
           notificationText: 'Gravando seu percurso. Toque para voltar ao app.',
-          notificationChannelName: 'Corrida em andamento',
+          notificationChannelName: 'Treino em andamento',
           enableWakeLock: true,
           setOngoing: true,
         ),
@@ -142,11 +160,13 @@ class Recorder extends ChangeNotifier {
     if (isActive) return;
     _reset();
     config = cfg;
+    _applySport();
     final now = DateTime.now().toUtc();
     startTime = now;
     activityId = await _db().insertActivity(Activity(
       start: now,
       type: cfg.type,
+      sport: cfg.sport,
       source: ActivitySource.recorded,
       status: ActivityStatus.inProgress,
     ));
@@ -158,7 +178,7 @@ class Recorder extends ChangeNotifier {
     _listen();
     _notify(force: true);
     final hi = _coach.onStart();
-    _say(['Corrida iniciada.', hi]);
+    _say([isBike ? 'Pedal iniciado.' : 'Corrida iniciada.', hi]);
     _showCoach(hi);
     notifyListeners();
   }
@@ -171,7 +191,13 @@ class Recorder extends ChangeNotifier {
     final pts = await db.getPoints(a.id!);
     activityId = a.id;
     startTime = a.start;
-    config = RunConfig(type: a.type, coachStyle: _defaultStyle());
+    config = RunConfig(
+      type: a.type,
+      sport: a.sport,
+      coachStyle: _defaultStyle(),
+      voiceEveryKm: a.isBike ? 5 : 1,
+    );
+    _applySport();
     _coach = Coach(style: config.coachStyle);
     points.addAll(pts);
     _savedCount = pts.length;
@@ -197,7 +223,7 @@ class Recorder extends ChangeNotifier {
     await _initTts();
     _listen();
     _notify(force: true);
-    _say(['Corrida retomada.']);
+    _say([isBike ? 'Pedal retomado.' : 'Corrida retomada.']);
     notifyListeners();
   }
 
@@ -207,7 +233,7 @@ class Recorder extends ChangeNotifier {
     state = RecState.paused;
     _paceWindow.clear();
     HapticFeedback.mediumImpact();
-    _say(['Corrida pausada.']);
+    _say([isBike ? 'Pedal pausado.' : 'Corrida pausada.']);
     _notify(force: true);
     notifyListeners();
   }
@@ -248,7 +274,7 @@ class Recorder extends ChangeNotifier {
       await finalizeActivity(_db(), id, weightKg: _weightKg(), extraLaps: laps, endTime: DateTime.now().toUtc());
       state = RecState.finished;
       final bye = _coach.onFinish(moving);
-      _say(['Corrida encerrada.', ...Speech.distance(distance), bye]);
+      _say([isBike ? 'Pedal encerrado.' : 'Corrida encerrada.', ...Speech.distance(distance), bye]);
       notifyListeners();
       return id;
     } finally {
@@ -298,7 +324,7 @@ class Recorder extends ChangeNotifier {
       movingSec: mov.round(),
       elapsedSec: end.difference(a.start).inSeconds,
       distanceM: dist,
-      calories: Calc.calories(weightKg, dist),
+      calories: Calc.caloriesFor(a.sport, weightKg, dist, mov),
       elevGain: elev.gain,
       elevLoss: elev.loss,
       avgHr: hr.avg,
@@ -397,7 +423,7 @@ class Recorder extends ChangeNotifier {
     _advanceClock(now);
 
     // Ponto impreciso com a pessoa parada só atrapalha.
-    if (p.accuracy > GpsFilter.maxAccuracyM && v < AutoPause.pauseBelow) {
+    if (p.accuracy > GpsFilter.maxAccuracyM && v < _autoPause.below) {
       notifyListeners();
       return;
     }
@@ -414,6 +440,7 @@ class Recorder extends ChangeNotifier {
       lon: sm.lon,
       time: t,
       lastAccepted: _segmentBreak ? null : last,
+      maxSpeed: config.sport.maxSpeedMps,
     );
     if (verdict != GpsVerdict.accept) {
       if (verdict == GpsVerdict.impossibleJump) _smoother.reset();
@@ -444,6 +471,8 @@ class Recorder extends ChangeNotifier {
 
     if (!autoPaused) {
       _paceWindow.add(moving, distance);
+      final k = currentKmh;
+      if (k != null && k < config.sport.maxSpeedMps * 3.6 && moving > 30) maxKmh = k > maxKmh ? k : maxKmh;
       _checkSplits();
       _checkAutoLap();
       _checkGoal();
@@ -484,7 +513,16 @@ class Recorder extends ChangeNotifier {
       final every = config.voiceEveryKm < 1 ? 1 : config.voiceEveryKm;
       final announce = km % every == 0;
       final msg = announce ? _coach.onKm(km, moving, splitSec: sec, avgPrevSec: avgPrev, every: every) : null;
-      if (config.voice && announce) {
+      if (config.voice && announce && isBike) {
+        _say([
+          Speech.kmCount(km),
+          'Tempo',
+          ...Speech.duration(moving),
+          'Velocidade média',
+          Speech.kmh(avgKmh ?? 0),
+          msg,
+        ]);
+      } else if (config.voice && announce) {
         _say([
           Speech.kmCount(km),
           'Tempo',
@@ -586,6 +624,11 @@ class Recorder extends ChangeNotifier {
   }
 
 
+  void _applySport() {
+    _autoPause.setSport(config.sport);
+    _smoother = GpsSmoother(qq: config.sport.smootherQ);
+  }
+
   void _reset() {
     _sub?.cancel();
     _sub = null;
@@ -598,6 +641,7 @@ class Recorder extends ChangeNotifier {
     laps.clear();
     distance = 0;
     moving = 0;
+    maxKmh = 0;
     accuracy = null;
     speed = null;
     autoPaused = false;
@@ -641,9 +685,15 @@ class Recorder extends ChangeNotifier {
         ? 'Pausada · $km km'
         : autoPaused
             ? 'Pausa automática · $km km'
-            : 'Correndo · $km km';
+            : isBike
+                ? 'Pedalando · $km km'
+                : 'Correndo · $km km';
     final lines = <String>[];
-    if (stopped) {
+    if (isBike) {
+      lines.add(stopped
+          ? 'Tempo ${Fmt.duration(moving)} · Média ${Fmt.kmh(avgKmh)} km/h'
+          : 'Velocidade ${Fmt.kmh(currentKmh)} km/h · Média ${Fmt.kmh(avgKmh)} km/h');
+    } else if (stopped) {
       lines.add('Tempo ${Fmt.duration(moving)} · Pace médio ${Fmt.pace(avgPace)} /km');
     } else {
       lines.add('Pace ${Fmt.pace(currentPace)} /km · Média ${Fmt.pace(avgPace)} /km');

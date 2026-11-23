@@ -46,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await f.writeAsBytes(bytes);
       await SharePlus.instance.share(ShareParams(
         files: [XFile(f.path, mimeType: 'application/zip')],
-        text: 'Backup do PACE (${app.activities.length} corridas). Guarde no Google Drive ou em outro local seguro.',
+        text: 'Backup do PACE (${app.allActivities.length} treinos). Guarde no Google Drive ou em outro local seguro.',
       ));
     } catch (e) {
       if (mounted) showSnack(context, 'Não foi possível gerar o backup: $e');

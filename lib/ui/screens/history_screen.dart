@@ -36,6 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   int? _month; // 1..12 dentro do ano escolhido
   _Dist _dist = _Dist.all;
   String? _type;
+  Sport? _sportF; // nulo = corridas e pedais
   _Source _source = _Source.all;
   _Sort _sort = _Sort.recent;
   String _query = '';
@@ -56,7 +57,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _Sort.oldest: 'Mais antigas',
     _Sort.longest: 'Mais longas',
     _Sort.longestTime: 'Mais tempo',
-    _Sort.fastest: 'Mais rápidas (pace)',
+    _Sort.fastest: 'Mais rápidas',
   };
   static const _months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -71,13 +72,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
       };
 
   int get _activeFilters =>
-      (_period != 'all' ? 1 : 0) + (_dist != _Dist.all ? 1 : 0) + (_type != null ? 1 : 0) + (_source != _Source.all ? 1 : 0) + (_query.isNotEmpty ? 1 : 0);
+      (_period != 'all' ? 1 : 0) +
+      (_dist != _Dist.all ? 1 : 0) +
+      (_type != null ? 1 : 0) +
+      (_sportF != null ? 1 : 0) +
+      (_source != _Source.all ? 1 : 0) +
+      (_query.isNotEmpty ? 1 : 0);
 
   void _clear() => setState(() {
         _period = 'all';
         _month = null;
         _dist = _Dist.all;
         _type = null;
+        _sportF = null;
         _source = _Source.all;
         _query = '';
         _search.clear();
@@ -110,12 +117,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _Dist.over21 => km >= 21,
     };
     if (!okDist) return false;
+    if (_sportF != null && a.sport != _sportF) return false;
     if (_type != null && a.type != _type) return false;
     if (_source == _Source.recorded && a.source != ActivitySource.recorded) return false;
     if (_source == _Source.imported && a.source == ActivitySource.recorded) return false;
     if (_query.isNotEmpty) {
       final q = _query.toLowerCase();
-      final hay = '${a.type} ${a.notes} ${Fmt.date(a.start)} ${Fmt.weekdayDate(a.start)} ${Fmt.km(a.distanceM)}'.toLowerCase();
+      final hay = '${a.sport.label} ${a.type} ${a.notes} ${Fmt.date(a.start)} ${Fmt.weekdayDate(a.start)} ${Fmt.km(a.distanceM)}'.toLowerCase();
       if (!hay.contains(q)) return false;
     }
     return true;
@@ -125,7 +133,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final now = DateTime.now();
-    final list = app.activities.where((a) => _matches(a, now)).toList();
+    final all = app.allActivities;
+    final list = all.where((a) => _matches(a, now)).toList();
     switch (_sort) {
       case _Sort.recent:
         break;
@@ -137,11 +146,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
         list.sort((a, b) => b.movingSec.compareTo(a.movingSec));
       case _Sort.fastest:
         list.removeWhere((a) => a.distanceM < 1000 || a.paceSecPerKm == null);
-        list.sort((a, b) => a.paceSecPerKm!.compareTo(b.paceSecPerKm!));
+        // Ranking por modalidade: pedal pela velocidade; corrida pelo pace.
+        if (_sportF == Sport.bike) {
+          list.sort((a, b) => a.paceSecPerKm!.compareTo(b.paceSecPerKm!));
+        } else {
+          list.removeWhere((a) => a.isBike);
+          list.sort((a, b) => a.paceSecPerKm!.compareTo(b.paceSecPerKm!));
+        }
     }
     final total = PeriodStats.of(list);
-    final years = {for (final a in app.activities) a.start.toLocal().year}.toList()..sort((a, b) => b.compareTo(a));
-    final types = {for (final a in app.activities) a.type}.toList()..sort();
+    final years = {for (final a in all) a.start.toLocal().year}.toList()..sort((a, b) => b.compareTo(a));
+    final types = {for (final a in all) if (_sportF == null || a.sport == _sportF) a.type}.toList()..sort();
     final byDate = _sort == _Sort.recent || _sort == _Sort.oldest;
     final recordIds = {for (final r in app.records.list) if (r.activityId != null) r.activityId!};
 
@@ -171,7 +186,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 520)),
           SafeArea(
             bottom: false,
-            child: app.activities.isEmpty
+            child: all.isEmpty
                 ? Center(
                     child: SingleChildScrollView(
                       child: EmptyState(
@@ -234,7 +249,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       if (_calendar)
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 6, 16, 130),
-                          sliver: SliverToBoxAdapter(child: RunCalendar(activities: app.activities)),
+                          sliver: SliverToBoxAdapter(child: RunCalendar(activities: all)),
                         )
                       else ...[
                         if (_searching)
@@ -286,13 +301,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     items: [
                                       (0, 'Todos os meses'),
                                       for (var m = 1; m <= 12; m++)
-                                        if (app.activities.any((a) {
+                                        if (all.any((a) {
                                           final l = a.start.toLocal();
                                           return l.year == _year && l.month == m;
                                         }))
                                           (m, _months[m - 1]),
                                     ],
                                     onPick: (v) => setState(() => _month = v == 0 ? null : v),
+                                  ),
+                                if (app.rides.isNotEmpty)
+                                  _MenuChip<int>(
+                                    icon: _sportF == Sport.bike ? Icons.directions_bike_rounded : Icons.directions_run_rounded,
+                                    label: _sportF == null ? 'Corrida e pedal' : _sportF!.label,
+                                    active: _sportF != null,
+                                    items: const [(0, 'Corrida e pedal'), (1, 'Só corridas'), (2, 'Só pedais')],
+                                    onPick: (v) => setState(() {
+                                      _sportF = v == 0 ? null : (v == 1 ? Sport.run : Sport.bike);
+                                      _type = null;
+                                    }),
                                   ),
                                 _MenuChip<_Dist>(
                                   icon: Icons.straighten_rounded,
@@ -336,7 +362,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                            child: _Summary(total: total),
+                            child: _Summary(total: total, list: list),
                           ),
                         ),
                         if (list.isEmpty)
@@ -345,7 +371,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               icon: Icons.filter_alt_off,
                               art: const Guara(pose: GuaraPose.sleep, size: 110),
                               title: 'Nada encontrado',
-                              message: 'Nenhuma corrida com esses filtros.',
+                              message: 'Nenhum treino com esses filtros.',
                               actions: [OutlinedButton(onPressed: _clear, child: const Text('Limpar filtros'))],
                             ),
                           ),
@@ -368,7 +394,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                           Expanded(child: Text(g.title, style: numStyle(17, color: Pal.of(context).ink))),
                                           if (st != null)
                                             Text(
-                                              '${Fmt.kmUnit(st.distanceM, decimals: 1)} · ${st.count} ${st.count == 1 ? 'corrida' : 'corridas'}',
+                                              '${Fmt.kmUnit(st.distanceM, decimals: 1)} · ${_countLabel(g.items)}',
                                               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Pal.of(context).muted),
                                             ),
                                         ],
@@ -410,15 +436,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
 /// Resumo do que está filtrado.
 class _Summary extends StatelessWidget {
   final PeriodStats total;
-  const _Summary({required this.total});
+  final List<Activity> list;
+  const _Summary({required this.total, required this.list});
 
   @override
   Widget build(BuildContext context) {
+    final bikes = list.where((a) => a.isBike).toList();
+    final runs = list.where((a) => !a.isBike).toList();
+    // Só pedais: velocidade média. Com corridas: pace médio só das corridas.
+    final onlyBike = runs.isEmpty && bikes.isNotEmpty;
+    final b = PeriodStats.of(bikes);
     final items = [
-      (Fmt.integer(total.count), total.count == 1 ? 'corrida' : 'corridas'),
+      (Fmt.integer(total.count), _countWord(list)),
       (Fmt.km(total.distanceM, decimals: total.distanceM >= 1000000 ? 0 : 1), 'km'),
       (Fmt.durationLong(total.movingSec), 'tempo'),
-      (Fmt.pace(total.avgPace), 'pace médio'),
+      onlyBike
+          ? (Fmt.kmh(b.movingSec > 0 ? b.distanceM / b.movingSec * 3.6 : null), 'km/h média')
+          : (Fmt.pace(PeriodStats.of(runs).avgPace), bikes.isEmpty ? 'pace médio' : 'pace (corridas)'),
     ];
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -503,6 +537,10 @@ class _RunRow extends StatelessWidget {
                           child: Icon(Icons.emoji_events_rounded, size: 15, color: Color(0xFFFFC53D)),
                         ),
                       ],
+                      if (a.isBike) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.directions_bike_rounded, size: 15, color: PaceColors.mintBright),
+                      ],
                       if (a.source != ActivitySource.recorded) ...[
                         const SizedBox(width: 4),
                         Icon(Icons.file_download_outlined, size: 14, color: p.muted),
@@ -525,7 +563,7 @@ class _RunRow extends StatelessWidget {
               children: [
                 Text(Fmt.duration(a.movingSec), style: numStyle(15, color: Colors.white)),
                 const SizedBox(height: 2),
-                Text('${Fmt.pace(a.paceSecPerKm)} /km', style: TextStyle(fontSize: 12, color: p.muted, fontWeight: FontWeight.w600)),
+                Text(Fmt.effort(a.paceSecPerKm, bike: a.isBike), style: TextStyle(fontSize: 12, color: p.muted, fontWeight: FontWeight.w600)),
               ],
             ),
           ],
@@ -579,3 +617,14 @@ class _MenuChip<T> extends StatelessWidget {
     );
   }
 }
+
+/// "3 corridas", "2 pedais" ou "5 treinos".
+String _countWord(List<Activity> l) {
+  final bikes = l.where((a) => a.isBike).length;
+  final n = l.length;
+  if (bikes == 0) return n == 1 ? 'corrida' : 'corridas';
+  if (bikes == n) return n == 1 ? 'pedal' : 'pedais';
+  return n == 1 ? 'treino' : 'treinos';
+}
+
+String _countLabel(List<Activity> l) => '${l.length} ${_countWord(l)}';

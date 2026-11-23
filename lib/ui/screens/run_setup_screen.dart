@@ -13,6 +13,7 @@ import '../../core/theme.dart';
 import '../../domain/calc.dart';
 import '../../domain/coach.dart';
 import '../../domain/models.dart';
+import '../../domain/stats.dart';
 import '../../services/recorder.dart';
 import '../../state/app_state.dart';
 import '../widgets/common.dart';
@@ -44,7 +45,10 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   double _autoLap = 0;
   bool _autoPause = true;
   bool _voice = true;
-  String _type = trainingTypes.first;
+  final Map<Sport, String> _typeBy = {Sport.run: trainingTypes.first, Sport.bike: bikeTypes.first};
+  Sport get _sport => context.read<AppState>().sport;
+  String get _type => _typeBy[_sport]!;
+  set _type(String v) => _typeBy[_sport] = v;
 
   LocationPermission? _perm;
   bool _serviceOn = true;
@@ -118,7 +122,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         final j = jsonDecode(raw) as Map<String, dynamic>;
         setState(() {
           final ty = j['type'] as String?;
-          if (ty != null && trainingTypes.contains(ty)) _type = ty;
+          if (ty != null && trainingTypes.contains(ty)) _typeBy[Sport.run] = ty;
+          final tb = j['type_bike'] as String?;
+          if (tb != null && bikeTypes.contains(tb)) _typeBy[Sport.bike] = tb;
           _goal = GoalType.values[((j['goal'] as num?) ?? 0).toInt().clamp(0, GoalType.values.length - 1)];
           _goalKm = ((j['km'] as num?) ?? 5).toDouble();
           _goalMin = ((j['min'] as num?) ?? 30).toInt();
@@ -135,7 +141,8 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   void _persist(AppState app) {
     if (!_restored || _applied != null) return;
     final snap = jsonEncode({
-      'type': _type,
+      'type': _typeBy[Sport.run],
+      'type_bike': _typeBy[Sport.bike],
       'goal': _goal.index,
       'km': _goalKm,
       'min': _goalMin,
@@ -309,8 +316,9 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         autoPause: _autoPause,
         voice: _voice,
         type: _type,
+        sport: _sport,
         coachStyle: context.read<AppState>().coachStyle,
-        voiceEveryKm: context.read<AppState>().voiceEveryKm,
+        voiceEveryKm: _sport == Sport.bike ? context.read<AppState>().bikeVoiceEveryKm : context.read<AppState>().voiceEveryKm,
       );
       context.read<AppState>().clearPreset();
       _applied = null;
@@ -388,7 +396,11 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
     final preset = app.pendingPreset;
     if (preset != null && !identical(preset, _applied)) {
       _applied = preset;
-      _type = trainingTypes.contains(preset.type) ? preset.type : trainingTypes.first;
+      // Planos de treino são de corrida.
+      if (app.sport != Sport.run) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => app.setSport(Sport.run));
+      }
+      _typeBy[Sport.run] = trainingTypes.contains(preset.type) ? preset.type : trainingTypes.first;
       if (preset.byTime) {
         _goal = GoalType.time;
         _goalMin = preset.value.round();
@@ -425,7 +437,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           Appear(
             child: Row(
               children: [
-                Text('Correr', style: numStyle(28, color: onSky)),
+                Text(app.sport.verb, style: numStyle(28, color: onSky)),
                 const SizedBox(width: 10),
                 // Sinal do GPS: só um pontinho colorido (toque para ver a precisão).
                 if (_hasPermission && _serviceOn)
@@ -446,6 +458,15 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                     ),
                   ),
                 const Spacer(),
+                _SportSwitch(
+                  value: app.sport,
+                  onChanged: _applied != null && app.sport == Sport.run
+                      ? null
+                      : (s) {
+                          HapticFeedback.selectionClick();
+                          app.setSport(s);
+                        },
+                ),
               ],
             ),
           ),
@@ -480,6 +501,11 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             delayMs: 120,
             child: Center(
               child: Builder(builder: (context) {
+                if (app.sport == Sport.bike) {
+                  final wk = PeriodStats.of(Periods.between(app.rides, Periods.weekStart(now), now.add(const Duration(days: 1)))).distanceM;
+                  final caption = wk <= 0 ? 'Bora pedalar?' : '${Fmt.km(wk, decimals: 1)} km\npedalados na semana';
+                  return _StartButton(onTap: _starting ? null : () => _start(), progress: 0, caption: caption, bike: true);
+                }
                 final goal = app.profile.weeklyGoalKm;
                 final km = app.weekStats(now).distanceM / 1000;
                 final prog = goal > 0 ? km / goal : 0.0;
@@ -502,7 +528,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             _Banner(
               icon: Icons.location_off,
               color: PaceColors.orange,
-              text: 'Permita a localização para gravar corridas com GPS.',
+              text: 'Permita a localização para gravar seus treinos com GPS.',
               action: 'Permitir',
               onTap: _askLocation,
             )
@@ -561,7 +587,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                         setState(() {
                           _applied = null;
                           _goal = GoalType.none;
-                          _type = trainingTypes.first;
+                          _typeBy[Sport.run] = trainingTypes.first;
                         });
                       },
                       icon: const Icon(Icons.close_rounded, color: PaceColors.muted),
@@ -572,7 +598,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             ),
           _SettingsFlag(
             title: 'Treino',
-            icon: Icons.directions_run_rounded,
+            icon: app.sport == Sport.bike ? Icons.directions_bike_rounded : Icons.directions_run_rounded,
             summary: [
               _type,
               switch (_goal) {
@@ -598,7 +624,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
                   child: Row(
                     children: [
-                      for (final ty in trainingTypes)
+                      for (final ty in app.sport.types)
                         Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: _TypePill(
@@ -634,7 +660,10 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                       if (_goal == GoalType.none)
                         Padding(
                           padding: const EdgeInsets.only(top: 10),
-                          child: Text('Sem alvo: corra o quanto quiser e encerre quando der.',
+                          child: Text(
+                              app.sport == Sport.bike
+                                  ? 'Sem alvo: pedale o quanto quiser e encerre quando der.'
+                                  : 'Sem alvo: corra o quanto quiser e encerre quando der.',
                               style: TextStyle(fontSize: 12.5, color: const Pal(true).muted)),
                         ),
                     ],
@@ -646,11 +675,13 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
           ),
           const SizedBox(height: 10),
           _SettingsFlag(
-            title: 'Ajustes da corrida',
+            title: app.sport == Sport.bike ? 'Ajustes do pedal' : 'Ajustes da corrida',
             icon: Icons.tune_rounded,
             summary: [
               _autoPause ? 'Pausa auto' : 'Sem pausa auto',
-              _voice ? 'Voz a cada ${context.watch<AppState>().voiceEveryKm} km' : 'Voz desligada',
+              _voice
+                  ? 'Voz a cada ${app.sport == Sport.bike ? app.bikeVoiceEveryKm : app.voiceEveryKm} km'
+                  : 'Voz desligada',
               if (_autoLap > 0) 'Volta ${(_autoLap / 1000).round()} km',
               context.watch<AppState>().coachStyle.label.split(' ').first,
             ].join(' · '),
@@ -665,10 +696,12 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                   trailing: DropdownButton<double>(
                     value: _autoLap,
                     underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(value: 0, child: Text('Desligada')),
-                      DropdownMenuItem(value: 1000, child: Text('A cada 1 km')),
-                      DropdownMenuItem(value: 5000, child: Text('A cada 5 km')),
+                    items: [
+                      const DropdownMenuItem(value: 0.0, child: Text('Desligada')),
+                      const DropdownMenuItem(value: 1000.0, child: Text('A cada 1 km')),
+                      const DropdownMenuItem(value: 5000.0, child: Text('A cada 5 km')),
+                      if (app.sport == Sport.bike || _autoLap == 10000)
+                        const DropdownMenuItem(value: 10000.0, child: Text('A cada 10 km')),
                     ],
                     onChanged: (v) => setState(() => _autoLap = v ?? 0),
                   ),
@@ -705,7 +738,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 SwitchListTile(
                   secondary: const Icon(Icons.record_voice_over_outlined),
                   title: const Text('Avisos por voz'),
-                  subtitle: const Text('Tempo, distância, pace e incentivo'),
+                  subtitle: Text(app.sport == Sport.bike ? 'Tempo, distância, velocidade e incentivo' : 'Tempo, distância, pace e incentivo'),
                   value: _voice,
                   onChanged: (v) => setState(() => _voice = v),
                 ),
@@ -715,7 +748,13 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                     return ListTile(
                       leading: const Icon(Icons.straighten_rounded),
                       title: const Text('Avisar a cada'),
-                      trailing: VoiceEveryPicker(value: app.voiceEveryKm, onChanged: app.setVoiceEveryKm),
+                      trailing: app.sport == Sport.bike
+                          ? VoiceEveryPicker(
+                              value: app.bikeVoiceEveryKm,
+                              onChanged: app.setBikeVoiceEveryKm,
+                              options: VoiceEveryPicker.bikeOptions,
+                            )
+                          : VoiceEveryPicker(value: app.voiceEveryKm, onChanged: app.setVoiceEveryKm),
                     );
                   }),
               ],
@@ -742,7 +781,8 @@ class _StartButton extends StatefulWidget {
   /// Progresso da meta da semana (0 a 1) e o texto embaixo de "INICIAR".
   final double progress;
   final String caption;
-  const _StartButton({required this.onTap, required this.progress, required this.caption});
+  final bool bike;
+  const _StartButton({required this.onTap, required this.progress, required this.caption, this.bike = false});
 
   @override
   State<_StartButton> createState() => _StartButtonState();
@@ -837,7 +877,7 @@ class _StartButtonState extends State<_StartButton> with SingleTickerProviderSta
     );
     return Semantics(
       button: true,
-      label: 'Iniciar corrida. ${widget.caption.replaceAll('\n', ' ')}',
+      label: '${widget.bike ? 'Iniciar pedal' : 'Iniciar corrida'}. ${widget.caption.replaceAll('\n', ' ')}',
       child: GestureDetector(
         onTapDown: (_) => setState(() => _down = true),
         onTapCancel: () => setState(() => _down = false),
@@ -1259,6 +1299,72 @@ class _Banner extends StatelessWidget {
             child: Text(action, style: const TextStyle(color: PaceColors.mintDark, fontWeight: FontWeight.w700)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Seletor Corrida | Pedal (vidro sobre o céu).
+class _SportSwitch extends StatelessWidget {
+  final Sport value;
+  final ValueChanged<Sport>? onChanged;
+  const _SportSwitch({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(Sport s, IconData icon) {
+      final sel = s == value;
+      return Semantics(
+        selected: sel,
+        button: true,
+        label: s.label,
+        child: GestureDetector(
+          onTap: onChanged == null || sel ? null : () => onChanged!(s),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: sel ? PaceColors.bgDark.withValues(alpha: 0.82) : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 17, color: sel ? PaceColors.mintBright : PaceColors.ink.withValues(alpha: 0.7)),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  child: sel
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 5),
+                          child: Text(s.label,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Opacity(
+      opacity: onChanged == null ? 0.6 : 1,
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            item(Sport.run, Icons.directions_run_rounded),
+            item(Sport.bike, Icons.directions_bike_rounded),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../../domain/models.dart';
 import '../../domain/stats.dart';
 import '../../state/app_state.dart';
 import '../widgets/achievement_widgets.dart';
@@ -27,6 +28,7 @@ class EvolutionScreen extends StatefulWidget {
 class _EvolutionScreenState extends State<EvolutionScreen> {
   EvoPeriod _p = EvoPeriod.d30;
   int _year = DateTime.now().year;
+  Sport _sport = Sport.run;
 
   static const _labels = {
     EvoPeriod.d7: '7 dias',
@@ -40,6 +42,10 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    if (app.rides.isEmpty) _sport = Sport.run;
+    final bike = _sport == Sport.bike;
+    final acts = app.listFor(_sport);
+    final life = PeriodStats.of(acts);
     final cs = glassTheme.colorScheme;
     final t = glassTheme.textTheme;
     final now = DateTime.now();
@@ -70,21 +76,21 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
         prevStart = DateTime(_year - 1);
         bucket = Bucket.month;
       case EvoPeriod.all:
-        final first = app.firstRunDate?.toLocal() ?? today;
+        final first = acts.isEmpty ? today : acts.last.start.toLocal();
         // Muitos anos: um ponto por ano; senão, por mês.
         final months = (now.year - first.year) * 12 + now.month - first.month + 1;
         bucket = months > 30 ? Bucket.year : Bucket.month;
         start = bucket == Bucket.year ? DateTime(first.year) : DateTime(first.year, first.month);
     }
     final span = stop.difference(start);
-    final cur = PeriodStats.of(Periods.between(app.activities, start, stop));
+    final cur = PeriodStats.of(Periods.between(acts, start, stop));
     final prev = _p == EvoPeriod.all
         ? null
         : _p == EvoPeriod.year
             // Ano anterior até o mesmo dia (comparação justa no ano em curso).
-            ? PeriodStats.of(Periods.between(app.activities, prevStart!, DateTime(_year - 1, stop.month, stop.day)))
-            : PeriodStats.of(Periods.between(app.activities, start.subtract(span), start));
-    final buckets = kmBuckets(app.activities, start, bucket == Bucket.month && _p == EvoPeriod.year ? DateTime(_year + 1) : stop, bucket);
+            ? PeriodStats.of(Periods.between(acts, prevStart!, DateTime(_year - 1, stop.month, stop.day)))
+            : PeriodStats.of(Periods.between(acts, start.subtract(span), start));
+    final buckets = kmBuckets(acts, start, bucket == Bucket.month && _p == EvoPeriod.year ? DateTime(_year + 1) : stop, bucket);
     final chartData = [
       for (final b in buckets)
         (
@@ -105,7 +111,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
           const Positioned(top: 0, left: 0, right: 0, child: MeshBackground(height: 560)),
           SafeArea(
             bottom: false,
-            child: app.activities.isEmpty
+            child: app.allActivities.isEmpty
           ? const Center(
               child: EmptyState(
                 icon: Icons.insights,
@@ -122,7 +128,21 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                 Appear(delayMs: 60, child: _Shortcuts(app: app)),
                 const SectionTitle('Metas'),
                 const Appear(delayMs: 120, child: GoalsCard()),
-                const SectionTitle('Seus números'),
+                SectionTitle(
+                  'Seus números',
+                  trailing: app.rides.isEmpty
+                      ? null
+                      : SegmentedButton<Sport>(
+                          showSelectedIcon: false,
+                          style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                          segments: const [
+                            ButtonSegment(value: Sport.run, icon: Icon(Icons.directions_run_rounded, size: 18), label: Text('Corrida')),
+                            ButtonSegment(value: Sport.bike, icon: Icon(Icons.directions_bike_rounded, size: 18), label: Text('Pedal')),
+                          ],
+                          selected: {_sport},
+                          onSelectionChanged: (v) => setState(() => _sport = v.first),
+                        ),
+                ),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -132,7 +152,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                           padding: const EdgeInsets.only(right: 8),
                           child: e.key == EvoPeriod.year
                               ? _YearChip(
-                                  years: _years(app),
+                                  years: _years(acts),
                                   selected: _p == EvoPeriod.year,
                                   year: _year,
                                   onPick: (y) => setState(() {
@@ -195,12 +215,12 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                     ],
                   ),
                 ),
-                const SectionTitle('Seu ano em corridas'),
+                SectionTitle(bike ? 'Seu ano no pedal' : 'Seu ano em corridas'),
                 PaceCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      YearMosaic(kmByDay: _kmByDay(app), today: now, weeks: 26),
+                      YearMosaic(kmByDay: _kmByDay(acts), today: now, weeks: 26),
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -224,7 +244,23 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                 ),
                 const SectionTitle('Resumo do período'),
                 PaceCard(
-                  child: StatGrid(columns: 2, spacing: 18, children: [
+                  child: StatGrid(columns: 2, spacing: 18, children: bike
+                      ? [
+                          _Cmp(label: 'Pedais', value: '${cur.count}', ratio: _ch(cur.count, prev?.count)),
+                          _Cmp(label: 'Tempo pedalando', value: Fmt.durationLong(cur.movingSec), ratio: _ch(cur.movingSec, prev?.movingSec)),
+                          _Cmp(
+                            label: 'Velocidade média',
+                            value: '${Fmt.speed(cur.avgSpeed)} km/h',
+                            ratio: (cur.avgSpeed != null && prev?.avgSpeed != null) ? Periods.change(cur.avgSpeed!, prev!.avgSpeed!) : null,
+                          ),
+                          _Cmp(label: 'Melhor média', value: cur.bestPace == null ? '—' : '${Fmt.kmh(3600 / cur.bestPace!)} km/h'),
+                          _Cmp(label: 'Maior distância', value: Fmt.kmUnit(cur.longestM)),
+                          _Cmp(label: 'Maior duração', value: Fmt.duration(cur.longestSec)),
+                          _Cmp(label: 'Dias ativos', value: '${cur.activeDays}'),
+                          _Cmp(label: 'Elevação acumulada', value: '${Fmt.integer(cur.elevGain)} m'),
+                          _Cmp(label: 'Calorias (estim.)', value: '${Fmt.integer(cur.calories)} kcal'),
+                        ]
+                      : [
                     _Cmp(label: 'Corridas', value: '${cur.count}', ratio: _ch(cur.count, prev?.count)),
                     _Cmp(label: 'Tempo correndo', value: Fmt.durationLong(cur.movingSec), ratio: _ch(cur.movingSec, prev?.movingSec)),
                     _Cmp(
@@ -255,9 +291,9 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                 const SectionTitle('Desde o início'),
                 PaceCard(
                   child: StatGrid(columns: 3, children: [
-                    StatTile(label: 'Corridas', value: Fmt.integer(app.lifetime.count)),
-                    StatTile(label: 'Distância', value: Fmt.integer(app.lifetime.distanceM / 1000), unit: 'km'),
-                    StatTile(label: 'Tempo', value: Fmt.durationLong(app.lifetime.movingSec)),
+                    StatTile(label: bike ? 'Pedais' : 'Corridas', value: Fmt.integer(life.count)),
+                    StatTile(label: 'Distância', value: Fmt.integer(life.distanceM / 1000), unit: 'km'),
+                    StatTile(label: 'Tempo', value: Fmt.durationLong(life.movingSec)),
                   ]),
                 ),
               ],
@@ -268,14 +304,14 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     );
   }
 
-  static List<int> _years(AppState app) {
-    final s = {DateTime.now().year, for (final a in app.activities) a.start.toLocal().year}.toList()..sort((a, b) => b.compareTo(a));
+  static List<int> _years(List<Activity> acts) {
+    final s = {DateTime.now().year, for (final a in acts) a.start.toLocal().year}.toList()..sort((a, b) => b.compareTo(a));
     return s;
   }
 
-  static Map<DateTime, double> _kmByDay(AppState app) {
+  static Map<DateTime, double> _kmByDay(List<Activity> acts) {
     final m = <DateTime, double>{};
-    for (final a in app.activities) {
+    for (final a in acts) {
       final l = a.start.toLocal();
       final d = DateTime(l.year, l.month, l.day);
       m[d] = (m[d] ?? 0) + a.distanceM / 1000;

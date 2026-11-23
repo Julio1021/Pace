@@ -165,7 +165,7 @@ class ShareCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       metric('Tempo', Fmt.duration(a.movingSec), null),
-                      metric('Pace', Fmt.pace(a.paceSecPerKm), '/km'),
+                      a.isBike ? metric('Média', Fmt.kmh(a.kmh), 'km/h') : metric('Pace', Fmt.pace(a.paceSecPerKm), '/km'),
                       if (a.elevGain >= 1)
                         metric('Subida', Fmt.integer(a.elevGain), 'm')
                       else
@@ -327,7 +327,7 @@ class _ShareRunScreenState extends State<ShareRunScreen> {
       highlight: widget.highlight,
     );
     return Scaffold(
-      appBar: AppBar(title: const Text('Compartilhar corrida')),
+      appBar: AppBar(title: Text(widget.activity.isBike ? 'Compartilhar pedal' : 'Compartilhar corrida')),
       body: Column(
         children: [
           Expanded(

@@ -31,12 +31,22 @@ class ActivityCard extends StatelessWidget {
                 Text('${Fmt.date(a.start)} · ${Fmt.time(a.start)}',
                     style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                 const SizedBox(height: 2),
-                Text(a.type, style: t.titleMedium),
+                Row(
+                  children: [
+                    if (a.isBike) ...[
+                      Icon(Icons.directions_bike_rounded, size: 18, color: cs.onSurfaceVariant),
+                      const SizedBox(width: 5),
+                    ],
+                    Flexible(child: Text(a.type, style: t.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 StatGrid(columns: 3, spacing: 8, children: [
                   StatTile(label: 'km', value: Fmt.km(a.distanceM)),
                   StatTile(label: 'tempo', value: Fmt.duration(a.movingSec)),
-                  StatTile(label: '/km', value: Fmt.pace(a.paceSecPerKm)),
+                  a.isBike
+                      ? StatTile(label: 'km/h', value: Fmt.kmh(a.kmh))
+                      : StatTile(label: '/km', value: Fmt.pace(a.paceSecPerKm)),
                 ]),
               ],
             ),
@@ -77,6 +87,10 @@ class ActivityListTile extends StatelessWidget {
                       Text(Fmt.kmUnit(a.distanceM),
                           style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                       const SizedBox(width: 8),
+                      if (a.isBike) ...[
+                        Icon(Icons.directions_bike_rounded, size: 15, color: cs.primary),
+                        const SizedBox(width: 3),
+                      ],
                       if (a.source != ActivitySource.recorded)
                         Icon(Icons.file_download_outlined, size: 14, color: cs.onSurfaceVariant),
                       if (a.gpsPartial) ...[
@@ -99,7 +113,7 @@ class ActivityListTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(Fmt.duration(a.movingSec), style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                Text(Fmt.paceUnit(a.paceSecPerKm), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                Text(Fmt.effort(a.paceSecPerKm, bike: a.isBike), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
               ],
             ),
           ],

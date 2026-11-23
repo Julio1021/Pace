@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/format.dart';
 import '../../core/theme.dart';
+import '../../domain/bike_records.dart';
 import '../../domain/records.dart';
 import '../../state/app_state.dart';
 import '../widgets/achievement_widgets.dart';
@@ -70,6 +72,20 @@ class RecordsScreen extends StatelessWidget {
                     ],
                   ),
           ),
+          if (app.rides.isNotEmpty) ...[
+            const SectionTitle('Pedal'),
+            GlassCard(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                children: [
+                  for (final (i, r) in BikeRecords.compute(app.rides).indexed) ...[
+                    if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+                    _BikeRow(r: r),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -117,6 +133,52 @@ class _RecordRow extends StatelessWidget {
                 if (r.activityId != null) Icon(Icons.chevron_right, color: p.muted),
               ],
             ),
+    );
+  }
+}
+
+class _BikeRow extends StatelessWidget {
+  final BikeRecord r;
+  const _BikeRow({required this.r});
+
+  @override
+  Widget build(BuildContext context) {
+    const p = Pal(true);
+    final a = r.activity;
+    final value = a == null
+        ? '—'
+        : switch (r.hint) {
+            'km' => Fmt.kmUnit(r.value, decimals: 1),
+            'tempo' => Fmt.duration(r.value),
+            'km/h' => '${Fmt.kmh(r.value)} km/h',
+            _ => '${Fmt.integer(r.value)} m',
+          };
+    return ListTile(
+      onTap: a?.id == null
+          ? null
+          : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ActivityDetailScreen(activityId: a!.id!))),
+      leading: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: a == null ? p.faint : PaceColors.mintBright.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(Icons.directions_bike_rounded, color: a == null ? p.muted : PaceColors.mintBright, size: 22),
+      ),
+      title: Text(r.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(
+        a == null ? 'Ainda sem um pedal que conte' : '${Fmt.date(a.start)} · ${Fmt.kmUnit(a.distanceM, decimals: 1)}',
+        style: TextStyle(color: p.muted, fontSize: 12.5),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value, style: numStyle(17, color: a == null ? p.muted : Colors.white)),
+          if (a != null) Icon(Icons.chevron_right, color: p.muted),
+        ],
+      ),
     );
   }
 }

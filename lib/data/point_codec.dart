@@ -26,15 +26,22 @@ class PointCodec {
       'cad': _int([for (final p in pts) p.cad]),
       'paused': [for (var i = 0; i < n; i++) if (pts[i].paused) i],
     };
-    final calc = Calc.accumulate(pts);
-    var distSame = true;
-    var movSame = true;
-    for (var i = 0; i < n; i++) {
-      if (calc[i].dist != pts[i].dist) distSame = false;
-      if (calc[i].mov != pts[i].mov) movSame = false;
+    // Recalculáveis? Testa o limite da corrida (12 m/s) e o do pedal (30 m/s).
+    String? distTag;
+    String? movTag;
+    for (final (tag, maxSpeed) in const [('calc', 12.0), ('calc30', 30.0)]) {
+      final calc = Calc.accumulate(pts, maxSpeed: maxSpeed);
+      var distSame = true;
+      var movSame = true;
+      for (var i = 0; i < n; i++) {
+        if (calc[i].dist != pts[i].dist) distSame = false;
+        if (calc[i].mov != pts[i].mov) movSame = false;
+      }
+      if (distSame) distTag ??= tag;
+      if (movSame) movTag ??= tag;
     }
-    out['dist'] = distSame ? 'calc' : _num([for (final p in pts) p.dist]);
-    out['mov'] = movSame ? 'calc' : _num([for (final p in pts) p.mov]);
+    out['dist'] = distTag ?? _num([for (final p in pts) p.dist]);
+    out['mov'] = movTag ?? _num([for (final p in pts) p.mov]);
     return out;
   }
 
@@ -49,8 +56,11 @@ class PointCodec {
     final hr = _unInt(m['hr'], n);
     final cad = _unInt(m['cad'], n);
     final paused = {for (final i in (m['paused'] as List? ?? const [])) (i as num).toInt()};
-    final distCalc = m['dist'] == 'calc';
-    final movCalc = m['mov'] == 'calc';
+    double? speedOf(Object? tag) => tag == 'calc' ? 12.0 : (tag == 'calc30' ? 30.0 : null);
+    final distSpeed = speedOf(m['dist']);
+    final movSpeed = speedOf(m['mov']);
+    final distCalc = distSpeed != null;
+    final movCalc = movSpeed != null;
     final dist = distCalc ? null : _unNum(m['dist'], n);
     final mov = movCalc ? null : _unNum(m['mov'], n);
     var time = 0;
@@ -71,9 +81,10 @@ class PointCodec {
         ),
     ];
     if (distCalc || movCalc) {
-      final calc = Calc.accumulate(pts);
+      final cd = distCalc ? Calc.accumulate(pts, maxSpeed: distSpeed) : null;
+      final cm = movCalc ? (movSpeed == distSpeed ? cd : Calc.accumulate(pts, maxSpeed: movSpeed)) : null;
       pts = [
-        for (var i = 0; i < n; i++) pts[i].withProgress(distCalc ? calc[i].dist : pts[i].dist, movCalc ? calc[i].mov : pts[i].mov),
+        for (var i = 0; i < n; i++) pts[i].withProgress(cd?[i].dist ?? pts[i].dist, cm?[i].mov ?? pts[i].mov),
       ];
     }
     return pts;

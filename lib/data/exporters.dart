@@ -28,7 +28,7 @@ class GpxWriter {
       ..writeln('  <metadata><time>${_iso(a.start)}</time></metadata>')
       ..writeln('  <trk>')
       ..writeln('    <name>${_esc(a.type)}</name>')
-      ..writeln('    <type>running</type>');
+      ..writeln('    <type>${a.isBike ? 'cycling' : 'running'}</type>');
     if (a.notes.isNotEmpty) buf.writeln('    <desc>${_esc(a.notes)}</desc>');
     buf.writeln('    <trkseg>');
     for (final p in b.points) {
@@ -59,7 +59,7 @@ class TcxWriter {
       ..writeln('<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" '
           'xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">')
       ..writeln('  <Activities>')
-      ..writeln('    <Activity Sport="Running">')
+      ..writeln('    <Activity Sport="${a.isBike ? 'Biking' : 'Running'}">')
       ..writeln('      <Id>${_iso(a.start)}</Id>')
       ..writeln('      <Lap StartTime="${_iso(a.start)}">')
       ..writeln('        <TotalTimeSeconds>${a.movingSec}</TotalTimeSeconds>')
@@ -85,7 +85,7 @@ class TcxWriter {
       if (p.speed != null || p.cad != null) {
         buf.write('<Extensions><ns3:TPX>');
         if (p.speed != null) buf.write('<ns3:Speed>${p.speed!.toStringAsFixed(2)}</ns3:Speed>');
-        if (p.cad != null) buf.write('<ns3:RunCadence>${p.cad}</ns3:RunCadence>');
+        if (p.cad != null && !a.isBike) buf.write('<ns3:RunCadence>${p.cad}</ns3:RunCadence>');
         buf.write('</ns3:TPX></Extensions>');
       }
       buf.writeln('</Trackpoint>');

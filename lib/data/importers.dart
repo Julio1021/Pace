@@ -116,6 +116,7 @@ class ActivityParser {
       source: ActivitySource.tcx,
       fileName: fileName,
       weightKg: weightKg,
+      sport: sportFromText(act.getAttribute('Sport')),
     );
   }
 
@@ -160,7 +161,15 @@ class ActivityParser {
       source: ActivitySource.gpx,
       fileName: fileName,
       weightKg: weightKg,
+      sport: sportFromText(_descendants(doc, 'type').firstOrNull?.innerText ?? _descendants(doc, 'name').firstOrNull?.innerText),
     );
+  }
+
+  /// "Biking", "cycling", "ride", "Pedal"… → pedal; o resto é corrida.
+  static Sport sportFromText(String? s) {
+    final t = (s ?? '').toLowerCase();
+    const bike = ['bik', 'cycl', 'ride', 'pedal', 'bicic', 'cicl', 'ciclismo', 'mtb'];
+    return bike.any(t.contains) ? Sport.bike : Sport.run;
   }
 
   // ---------------- Montagem ----------------
@@ -175,8 +184,9 @@ class ActivityParser {
     required ActivitySource source,
     required String? fileName,
     required double weightKg,
+    Sport sport = Sport.run,
   }) {
-    final pts = Calc.accumulate(points);
+    final pts = Calc.accumulate(points, maxSpeed: sport.maxImportSpeedMps);
     final ptsDist = pts.isEmpty ? 0.0 : pts.last.dist;
     final ptsMov = pts.isEmpty ? 0.0 : pts.last.mov;
 
@@ -203,13 +213,14 @@ class ActivityParser {
       movingSec: moving.round(),
       elapsedSec: elapsed > moving ? elapsed : moving.round(),
       distanceM: dist,
-      calories: summaryCal ?? Calc.calories(weightKg, dist),
+      calories: summaryCal ?? Calc.caloriesFor(sport, weightKg, dist, moving),
       elevGain: elev.gain,
       elevLoss: elev.loss,
       avgHr: avgHr,
       maxHr: maxHr,
       avgCad: Calc.avgCadence(pts),
-      type: 'Corrida livre',
+      type: sport.types.first,
+      sport: sport,
       source: source,
       sourceFile: fileName,
       gpsPartial: partial,

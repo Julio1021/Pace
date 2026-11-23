@@ -81,13 +81,17 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     Appear(
                       delayMs: 240,
-                      child: _LastRunCard(
-                        a: last,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ActivityDetailScreen(activityId: last.id!)),
-                        ),
-                      ),
+                      child: Builder(builder: (context) {
+                        // O treino mais recente, seja corrida ou pedal.
+                        final recent = app.allActivities.first;
+                        return _LastRunCard(
+                          a: recent,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ActivityDetailScreen(activityId: recent.id!)),
+                          ),
+                        );
+                      }),
                     ),
                     const SizedBox(height: 12),
                     Appear(delayMs: 320, child: _Last7(activities: app.activities, now: now)),
@@ -588,7 +592,7 @@ class _LastRunCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$when · ${a.type}',
+                Text('$when · ${a.isBike ? 'Pedal · ' : ''}${a.type}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.muted)),
@@ -599,7 +603,7 @@ class _LastRunCard extends StatelessWidget {
                   spacing: 12,
                   children: [
                     _kv(context, Fmt.duration(a.movingSec), 'tempo'),
-                    _kv(context, Fmt.pace(a.paceSecPerKm), '/km'),
+                    a.isBike ? _kv(context, Fmt.kmh(a.kmh), 'km/h') : _kv(context, Fmt.pace(a.paceSecPerKm), '/km'),
                   ],
                 ),
               ],

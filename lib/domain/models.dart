@@ -23,6 +23,40 @@ extension ActivitySourceX on ActivitySource {
       };
 }
 
+/// Modalidade do treino.
+enum Sport { run, bike }
+
+extension SportX on Sport {
+  String get key => this == Sport.run ? 'corrida' : 'pedal';
+  String get label => this == Sport.run ? 'Corrida' : 'Pedal';
+  String get verb => this == Sport.run ? 'Correr' : 'Pedalar';
+  bool get isBike => this == Sport.bike;
+
+  /// Limite de velocidade aceitável no GPS (m/s): acima disso é salto/erro.
+  double get maxSpeedMps => this == Sport.run ? 9.0 : 25.0;
+
+  /// Limite ao somar distância de trilhas importadas (m/s).
+  double get maxImportSpeedMps => this == Sport.run ? 12.0 : 30.0;
+
+  /// Quanto a posição pode mudar por segundo no filtro de suavização.
+  double get smootherQ => this == Sport.run ? 3.0 : 8.0;
+
+  List<String> get types => this == Sport.run ? trainingTypes : bikeTypes;
+
+  static Sport parse(String? s) => s == 'pedal' ? Sport.bike : Sport.run;
+}
+
+/// Tipos de treino de bicicleta.
+const bikeTypes = <String>[
+  'Pedal livre',
+  'Pedal leve',
+  'Pedal longo',
+  'Intervalado',
+  'Subidas',
+  'Recuperação',
+  'Prova',
+];
+
 class ActivityStatus {
   static const inProgress = 'em_andamento';
   static const done = 'concluida';
@@ -61,6 +95,7 @@ class Activity {
   final String status;
   final int? bestKmSec;
   final int lapCount;
+  final Sport sport;
 
   /// Trajeto simplificado ("lat,lon;lat,lon") para miniaturas sem carregar os pontos.
   final String preview;
@@ -87,7 +122,13 @@ class Activity {
     this.bestKmSec,
     this.lapCount = 0,
     this.preview = '',
+    this.sport = Sport.run,
   });
+
+  bool get isBike => sport == Sport.bike;
+
+  /// Velocidade média em km/h.
+  double? get kmh => avgSpeed == null ? null : avgSpeed! * 3.6;
 
   double get km => distanceM / 1000;
 
@@ -134,6 +175,7 @@ class Activity {
     int? bestKmSec,
     int? lapCount,
     String? preview,
+    Sport? sport,
   }) =>
       Activity(
         id: id ?? this.id,
@@ -157,6 +199,7 @@ class Activity {
         bestKmSec: bestKmSec ?? this.bestKmSec,
         lapCount: lapCount ?? this.lapCount,
         preview: preview ?? this.preview,
+        sport: sport ?? this.sport,
       );
 
   Map<String, Object?> toMap() => {
@@ -181,6 +224,7 @@ class Activity {
         'best_km_sec': bestKmSec,
         'lap_count': lapCount,
         'preview': preview,
+        'sport': sport.key,
       };
 
   static Activity fromMap(Map<String, Object?> m) => Activity(
@@ -205,6 +249,7 @@ class Activity {
         bestKmSec: m['best_km_sec'] as int?,
         lapCount: (m['lap_count'] as int?) ?? 0,
         preview: (m['preview'] as String?) ?? '',
+        sport: SportX.parse(m['sport'] as String?),
       );
 }
 

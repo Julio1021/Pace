@@ -8,7 +8,8 @@ import '../domain/models.dart';
 /// Banco local (SQLite). Todas as corridas ficam no celular.
 class PaceDatabase {
   static const fileName = 'pace.db';
-  static const version = 1;
+  /// 2: coluna "sport" (corrida/pedal).
+  static const version = 2;
 
   final Database db;
   PaceDatabase(this.db);
@@ -22,6 +23,11 @@ class PaceDatabase {
         version: version,
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: (db, v) async => createSchema(db),
+        onUpgrade: (db, from, to) async {
+          if (from < 2) {
+            await db.execute("ALTER TABLE activities ADD COLUMN sport TEXT NOT NULL DEFAULT 'corrida'");
+          }
+        },
       ),
     );
     return PaceDatabase(db);
@@ -50,7 +56,8 @@ class PaceDatabase {
         status TEXT NOT NULL,
         best_km_sec INTEGER,
         lap_count INTEGER NOT NULL DEFAULT 0,
-        preview TEXT NOT NULL DEFAULT ''
+        preview TEXT NOT NULL DEFAULT '',
+        sport TEXT NOT NULL DEFAULT 'corrida'
       )''');
     await db.execute('CREATE INDEX idx_act_start ON activities(start)');
     await db.execute('''
