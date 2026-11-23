@@ -4,6 +4,7 @@ import 'package:archive/archive.dart';
 
 import '../domain/models.dart';
 import 'database.dart';
+import 'point_codec.dart';
 
 String _iso(DateTime t) => t.toUtc().toIso8601String().replaceFirst(RegExp(r'\.\d+Z$'), 'Z');
 
@@ -108,7 +109,8 @@ class BackupCodec {
   static const _skipKv = {'profile', 'pcloud', 'weather', 'efforts_v1'};
 
   static const format = 'pace-backup';
-  static const formatVersion = 1;
+  /// 2: pontos compactos ('pc'). Restaura também o formato 1 ('points').
+  static const formatVersion = 2;
 
   static Future<List<int>> build(PaceDatabase db, {bool gpx = true}) async {
     final profile = await db.getProfile();
@@ -120,7 +122,7 @@ class BackupCodec {
       if (b == null) continue;
       list.add({
         'activity': b.activity.toMap()..remove('id'),
-        'points': [for (var i = 0; i < b.points.length; i++) b.points[i].toMap(0, i)..remove('activity_id')],
+        'pc': PointCodec.encode(b.points),
         'splits': [for (final s in b.splits) s.toMap(0)..remove('activity_id')],
         'laps': [for (final l in b.laps) l.toMap(0)..remove('activity_id')],
       });
@@ -184,7 +186,9 @@ class BackupCodec {
           (m[k] as List? ?? const []).map((e) => Map<String, Object?>.from(e as Map)).toList();
       await db.insertBundle(ActivityBundle(
         activity: a,
-        points: rows('points').map(TrackPoint.fromMap).toList(),
+        points: m['pc'] is Map
+            ? PointCodec.decode(Map<String, Object?>.from(m['pc'] as Map))
+            : rows('points').map(TrackPoint.fromMap).toList(),
         splits: rows('splits').map(Split.fromMap).toList(),
         laps: rows('laps').map(Lap.fromMap).toList(),
       ));

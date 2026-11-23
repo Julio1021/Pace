@@ -27,6 +27,8 @@ void main() {
     final names = ZipDecoder().decodeBytes(cloud).files.map((f) => f.name).toList();
     expect(names, ['backup.json']);
     expect(cloud.length, lessThan(full.length));
+    // ignore: avoid_print
+    print('TAMANHO backup: completo ${full.length} B, nuvem ${cloud.length} B');
 
     final fresh = await openTestDb();
     final r = await BackupCodec.restore(fresh, cloud);
