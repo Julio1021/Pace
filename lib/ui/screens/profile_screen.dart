@@ -227,7 +227,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   subtitle: Text(!PCloudService.configured
                       ? 'Aguardando aprovação da pCloud'
                       : app.pcloudConnected
-                          ? (app.lastCloudBackup == null ? 'Conectado' : 'Último: ${Fmt.dateTime(app.lastCloudBackup!.toUtc())}')
+                          ? (app.cloudWaitingWifi
+                              ? 'Aguardando Wi-Fi'
+                              : app.lastCloudBackup == null
+                                  ? 'Conectado'
+                                  : 'Último backup ${cloudWhen(app.lastCloudBackup!, sentence: true)}')
                           : 'Backup automático na nuvem'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CloudBackupScreen())),

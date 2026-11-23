@@ -162,6 +162,7 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _refreshStatus();
+      context.read<AppState>().cloudTick();
     } else if (state == AppLifecycleState.paused) {
       _stopPreview();
     }

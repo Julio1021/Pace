@@ -65,6 +65,11 @@ class AppState extends ChangeNotifier {
   String? pcloudEmail;
   DateTime? lastCloudBackup;
   int _lastCloudCount = -1;
+  int? lastCloudSize;
+  bool cloudAuto = true;
+  bool cloudWifiOnly = true;
+  /// Há corrida nova esperando Wi-Fi para subir.
+  bool cloudWaitingWifi = false;
   bool cloudBusy = false;
   String? cloudError;
 
@@ -80,6 +85,9 @@ class AppState extends ChangeNotifier {
       final t = (j['last'] as num?)?.toInt();
       lastCloudBackup = t == null ? null : DateTime.fromMillisecondsSinceEpoch(t);
       _lastCloudCount = (j['count'] as num?)?.toInt() ?? -1;
+      lastCloudSize = (j['size'] as num?)?.toInt();
+      cloudAuto = j['auto'] as bool? ?? true;
+      cloudWifiOnly = j['wifi'] as bool? ?? true;
     } catch (_) {}
   }
 
@@ -95,6 +103,9 @@ class AppState extends ChangeNotifier {
               'email': pcloudEmail,
               'last': lastCloudBackup?.millisecondsSinceEpoch,
               'count': _lastCloudCount,
+              'size': lastCloudSize,
+              'auto': cloudAuto,
+              'wifi': cloudWifiOnly,
             }),
     );
   }
@@ -123,16 +134,30 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> setCloudOptions({bool? auto, bool? wifiOnly}) async {
+    if (auto != null) cloudAuto = auto;
+    if (wifiOnly != null) cloudWifiOnly = wifiOnly;
+    await _saveCloud();
+    notifyListeners();
+    await _autoCloudBackup();
+  }
+
+  /// Chamado quando o app volta ao primeiro plano (tenta o envio pendente).
+  Future<void> cloudTick() => _autoCloudBackup();
+
   Future<void> disconnectPCloud() async {
     pcloud = null;
     pcloudEmail = null;
     lastCloudBackup = null;
+    lastCloudSize = null;
+    cloudWaitingWifi = false;
     _lastCloudCount = -1;
     await _saveCloud();
     notifyListeners();
   }
 
-  /// Envia um backup agora (e mantém só os 10 mais recentes).
+  /// Envia um backup agora (e mantém só os 3 mais recentes no pCloud).
+  /// Sem os .gpx: a restauração usa só o backup.json, que já tem todos os pontos.
   Future<bool> backupToCloud() async {
     final c = pcloud;
     if (c == null || cloudBusy) return false;
@@ -140,14 +165,18 @@ class AppState extends ChangeNotifier {
     cloudError = null;
     notifyListeners();
     try {
-      final bytes = Uint8List.fromList(await BackupCodec.build(db));
+      final bytes = Uint8List.fromList(await BackupCodec.build(db, gpx: false));
       final n = DateTime.now();
       String two(int v) => v.toString().padLeft(2, '0');
-      await c.upload('pace_backup_${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}${two(n.minute)}.zip', bytes);
+      await c.upload(
+          'pace_backup_${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}${two(n.minute)}_${activities.length}c.zip',
+          bytes);
       try {
         await c.prune();
       } catch (_) {}
       lastCloudBackup = n;
+      lastCloudSize = bytes.length;
+      cloudWaitingWifi = false;
       _lastCloudCount = activities.length;
       await _saveCloud();
       return true;
@@ -163,11 +192,22 @@ class AppState extends ChangeNotifier {
 
   /// Automático: depois de uma corrida nova ou se passou uma semana.
   Future<void> _autoCloudBackup() async {
-    if (pcloud == null) return;
+    if (pcloud == null || !cloudAuto || cloudBusy) return;
     final last = lastCloudBackup;
     final changed = activities.length != _lastCloudCount;
     final old = last == null || DateTime.now().difference(last).inDays >= 7;
-    if (changed || old) await backupToCloud();
+    if (!changed && !old) return;
+    if (cloudWifiOnly) {
+      final net = await PCloudService.network();
+      if (net != 'wifi') {
+        if (!cloudWaitingWifi) {
+          cloudWaitingWifi = true;
+          notifyListeners();
+        }
+        return;
+      }
+    }
+    await backupToCloud();
   }
 
   Future<({int restored, int skipped})> restoreFromCloud(int fileId) async {

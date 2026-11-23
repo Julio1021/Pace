@@ -97,6 +97,12 @@ class PaceDatabase {
     return r.isEmpty ? null : r.first['value'] as String;
   }
 
+  /// Todas as configurações guardadas (chave → valor).
+  Future<Map<String, String>> allKv() async {
+    final r = await db.query('kv');
+    return {for (final m in r) '${m['key']}': '${m['value']}'};
+  }
+
   Future<void> setKv(String key, String value) =>
       db.insert('kv', {'key': key, 'value': value}, conflictAlgorithm: ConflictAlgorithm.replace);
 

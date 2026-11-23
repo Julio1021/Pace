@@ -19,6 +19,12 @@ class CloudBackup {
   final int size;
   final DateTime created;
   const CloudBackup(this.fileId, this.name, this.size, this.created);
+
+  /// Quantidade de corridas, se veio no nome (…_214c.zip).
+  int? get runs {
+    final m = RegExp(r'_(\d+)c\.zip$').firstMatch(name);
+    return m == null ? null : int.parse(m[1]!);
+  }
 }
 
 class PCloudException implements Exception {
@@ -209,10 +215,21 @@ class PCloudService {
   }
 
   /// Mantém só os [keep] backups mais recentes.
-  Future<void> prune({int keep = 10}) async {
+  Future<void> delete(int fileId) => _call('deletefile', {'fileid': '$fileId'});
+
+  /// Tipo de rede agora: "wifi", "mobile" ou "none".
+  static Future<String> network() async {
+    try {
+      return await _ch.invokeMethod<String>('network') ?? 'wifi';
+    } catch (_) {
+      return 'wifi';
+    }
+  }
+
+  Future<void> prune({int keep = 3}) async {
     final all = await list();
     for (final b in all.skip(keep)) {
-      await _call('deletefile', {'fileid': '${b.fileId}'});
+      await delete(b.fileId);
     }
   }
 }

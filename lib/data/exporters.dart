@@ -101,12 +101,16 @@ class TcxWriter {
   }
 }
 
-/// Backup completo: um .zip com backup.json (tudo) e um .gpx por corrida (para outros apps).
+/// Backup completo: um .zip com backup.json (tudo: corridas, pontos, perfil e configurações).
+/// Opcionalmente inclui um .gpx por corrida, só para abrir em outros apps (a restauração não usa).
 class BackupCodec {
+  /// Chaves que não vão no backup: perfil (já vai à parte), acesso ao pCloud e caches.
+  static const _skipKv = {'profile', 'pcloud', 'weather', 'efforts_v1'};
+
   static const format = 'pace-backup';
   static const formatVersion = 1;
 
-  static Future<List<int>> build(PaceDatabase db) async {
+  static Future<List<int>> build(PaceDatabase db, {bool gpx = true}) async {
     final profile = await db.getProfile();
     final acts = await db.listActivities();
     final arc = Archive();
@@ -120,7 +124,7 @@ class BackupCodec {
         'splits': [for (final s in b.splits) s.toMap(0)..remove('activity_id')],
         'laps': [for (final l in b.laps) l.toMap(0)..remove('activity_id')],
       });
-      if (b.points.isNotEmpty) {
+      if (gpx && b.points.isNotEmpty) {
         arc.addFile(ArchiveFile.string('gpx/${exportFileName(a, 'gpx')}', GpxWriter.write(b)));
       }
     }
@@ -129,10 +133,14 @@ class BackupCodec {
       'version': formatVersion,
       'created': DateTime.now().toUtc().toIso8601String(),
       'profile': profile.toJson(),
+      'settings': {
+        for (final e in (await db.allKv()).entries)
+          if (!_skipKv.contains(e.key)) e.key: e.value,
+      },
       'activities': list,
     });
     arc.addFile(ArchiveFile.string('backup.json', json));
-    return ZipEncoder().encodeBytes(arc);
+    return ZipEncoder().encodeBytes(arc, level: 9);
   }
 
   /// Restaura um backup. Corridas que já existem (mesmo início e distância) são ignoradas.
@@ -152,6 +160,16 @@ class BackupCodec {
     if (profile is Map<String, Object?>) {
       final current = await db.getProfile();
       if (!current.isComplete) await db.saveProfile(UserProfile.fromJson(profile));
+    }
+    // Configurações: só preenche o que ainda não existe no celular.
+    final settings = data['settings'];
+    if (settings is Map) {
+      final current = await db.allKv();
+      for (final e in settings.entries) {
+        final k = '${e.key}';
+        if (_skipKv.contains(k) || current.containsKey(k)) continue;
+        await db.setKv(k, '${e.value}');
+      }
     }
     var restored = 0;
     var skipped = 0;
