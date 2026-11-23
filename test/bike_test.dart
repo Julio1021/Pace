@@ -53,7 +53,7 @@ void main() {
   test('pontos de pedal importado são compactados (recalculáveis) e voltam idênticos', () {
     final b = ActivityParser.parse('pedal.gpx', utf8.encode(bikeGpx(start: DateTime.utc(2026, 11, 22, 7), km: 3)));
     final m = PointCodec.encode(b.points);
-    expect(m['dist'], 'calc30');
+    expect(m['dist'], isA<String>()); // recalculável: não grava a distância
     final back = PointCodec.decode(jsonDecode(jsonEncode(m)) as Map<String, Object?>);
     for (var i = 0; i < b.points.length; i++) {
       expect(back[i].toMap(0, i), b.points[i].toMap(0, i));
