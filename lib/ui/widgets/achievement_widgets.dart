@@ -90,7 +90,7 @@ const _metals = <List<Color>>[
   [Color(0xFFF6D2B0), Color(0xFFD08B55), Color(0xFFA7602E), Color(0xFF6B3815), Color(0xFF5A2E10)], // bronze
   [Color(0xFFFFFFFF), Color(0xFFD9E0E8), Color(0xFF9AA6B4), Color(0xFF5D6876), Color(0xFF465260)], // prata
   [Color(0xFFFFF6C4), Color(0xFFFFD54A), Color(0xFFE0A100), Color(0xFF8A5A00), Color(0xFF6E4600)], // ouro
-  [Color(0xFFFFFFFF), Color(0xFFE3F2FF), Color(0xFFA9C6E6), Color(0xFF5B7899), Color(0xFF3D5677)], // platina
+  [Color(0xFFF4FBFF), Color(0xFFCFE6FF), Color(0xFF8DB4E8), Color(0xFF3F6AA6), Color(0xFF2B4C7E)], // platina
 ];
 const _lockedMetal = [Color(0xFF4B5363), Color(0xFF363D4A), Color(0xFF2A303B), Color(0xFF1C2129), Color(0xFF7D8898)];
 
@@ -160,10 +160,10 @@ class _BadgeMedalState extends State<BadgeMedal> with SingleTickerProviderStateM
             paint,
             if (b.unlocked && face.guara)
               Positioned(
-                left: w / 2 - r * 0.62,
-                top: cy - r * 0.78,
-                width: r * 1.24,
-                height: r * 1.24,
+                left: w / 2 - r * 0.52,
+                top: cy - r * 0.74,
+                width: r * 1.04,
+                height: r * 1.04,
                 child: SvgPicture.string(GuaraArt.head, fit: BoxFit.contain),
               ),
           ],
@@ -280,13 +280,13 @@ class _MedalPainter extends CustomPainter {
     if (on && b.tier >= 2) {
       final leaf = Paint()..color = m[4].withValues(alpha: 0.5);
       for (final side in [-1, 1]) {
-        for (var i = 0; i < 6; i++) {
-          final a = math.pi / 2 + side * (0.55 + i * 0.28);
-          final p = c + Offset(math.cos(a), math.sin(a)) * r * 0.6;
+        for (var i = 0; i < 5; i++) {
+          final a = math.pi / 2 + side * (0.95 + i * 0.26);
+          final p = c + Offset(math.cos(a), math.sin(a)) * r * 0.62;
           canvas.save();
           canvas.translate(p.dx, p.dy);
           canvas.rotate(a + side * math.pi / 3);
-          canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: w * 0.07, height: w * 0.032), leaf);
+          canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: w * 0.06, height: w * 0.028), leaf);
           canvas.restore();
         }
       }
@@ -296,10 +296,10 @@ class _MedalPainter extends CustomPainter {
     if (!on) {
       _lock(canvas, c, w, m[4]);
     } else if (!face.guara) {
-      _emboss(canvas, (cv, color) => _face(cv, c, w, r, color), m[4]);
+      _emboss(canvas, (cv, color, light) => _face(cv, c, w, r, color, light), m[4]);
     }
     if (on && face.guara && face.small != null) {
-      _text(canvas, face.small!, c.translate(0, r * 0.5), w * 0.068, m[4], spacing: 1, weight: FontWeight.w700);
+      _text(canvas, face.small!, c.translate(0, r * 0.56), w * 0.06, m[4], spacing: 0.6, weight: FontWeight.w700);
     }
 
     // Brilhos: reflexo fixo e reflexo que passa.
@@ -348,18 +348,19 @@ class _MedalPainter extends CustomPainter {
   }
 
   /// Desenha duas vezes (luz embaixo-direita, gravação em cima) para parecer cunhado.
-  void _emboss(Canvas canvas, void Function(Canvas, Color) draw, Color engraved) {
+  void _emboss(Canvas canvas, void Function(Canvas, Color, bool) draw, Color engraved) {
     canvas.save();
     canvas.translate(0.9, 1.1);
-    draw(canvas, Colors.white.withValues(alpha: 0.55));
+    draw(canvas, Colors.white.withValues(alpha: 0.55), true);
     canvas.restore();
     canvas.save();
     canvas.translate(-0.5, -0.5);
-    draw(canvas, engraved);
+    draw(canvas, engraved, false);
     canvas.restore();
   }
 
-  void _face(Canvas canvas, Offset c, double w, double r, Color color) {
+  /// [light]: passada de luz do relevo (letras pequenas só na passada final, para não borrar).
+  void _face(Canvas canvas, Offset c, double w, double r, Color color, bool light) {
     final f = face;
     if (f.symbol != null) {
       final hasNum = f.symbol == MedalSymbol.flame && f.big != null;
@@ -370,19 +371,20 @@ class _MedalPainter extends CustomPainter {
         _text(canvas, f.big!, origin + Offset(box / 2, box * 0.62), w * 0.13, Color.lerp(color, Colors.white, 0.0)!,
             weight: FontWeight.w700, knock: true);
       }
-      if (f.small != null) {
-        _text(canvas, f.small!, c.translate(0, r * 0.5), w * 0.064, color, spacing: 0.8, weight: FontWeight.w700);
+      if (f.small != null && !light) {
+        _text(canvas, f.small!, c.translate(0, r * 0.52), w * 0.062, color, spacing: 0.6, weight: FontWeight.w700);
       }
       return;
     }
     final big = f.big ?? '';
-    final size = switch (big.length) { 1 => w * 0.3, 2 => w * 0.26, 3 => w * 0.21, _ => w * 0.16 };
+    final size = switch (big.length) { 1 => w * 0.3, 2 => w * 0.25, 3 => w * 0.2, _ => w * 0.15 };
     final dy = f.top != null ? r * 0.08 : -r * 0.06;
     _text(canvas, big, c.translate(0, dy), size, color, weight: FontWeight.w700);
-    if (f.top != null) _text(canvas, f.top!, c.translate(0, dy - size * 0.62), w * 0.07, color, spacing: 1.5, weight: FontWeight.w700);
+    if (light) return;
+    if (f.top != null) _text(canvas, f.top!, c.translate(0, dy - size * 0.66), w * 0.065, color, spacing: 1.4, weight: FontWeight.w700);
     if (f.small != null) {
-      _text(canvas, f.small!, c.translate(0, dy + size * 0.6), f.small!.length > 6 ? w * 0.058 : w * 0.075, color,
-          spacing: 1, weight: FontWeight.w700);
+      _text(canvas, f.small!, c.translate(0, dy + size * 0.66), f.small!.length > 6 ? w * 0.052 : w * 0.07, color,
+          spacing: 0.6, weight: FontWeight.w700);
     }
   }
 
