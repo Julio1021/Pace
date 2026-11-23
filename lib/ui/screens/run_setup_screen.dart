@@ -18,7 +18,9 @@ import '../widgets/common.dart';
 import '../widgets/guara.dart';
 import '../widgets/pace_ui.dart';
 import '../widgets/sky_scene.dart';
+import '../widgets/goal_editor.dart';
 import '../widgets/voice_every.dart';
+import '../../services/weather.dart';
 import 'live_run_screen.dart';
 
 /// Preparação da corrida: permissões, sinal de GPS e opções.
@@ -294,7 +296,14 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
         }
       }
     }
-    final sky = SkyInfo.at(now, lat: lat, lon: lon);
+    final w = app.weather;
+    final sky = SkyInfo.at(now, lat: lat, lon: lon).withWeather(w);
+    // Previsão do tempo (a cada 30 min, só com a tela visível).
+    if (widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<AppState>().refreshWeather(lat, lon);
+      });
+    }
     // Treino escolhido num plano: preenche tipo e meta uma vez.
     final preset = app.pendingPreset;
     if (preset != null && !identical(preset, _applied)) {
@@ -360,8 +369,16 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${Fmt.weekdayDate(now.toUtc()).split(',').first} · ${sky.label}',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSky.withValues(alpha: 0.75))),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text('${Fmt.weekdayDate(now.toUtc()).split(',').first} · ${sky.label}',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onSky.withValues(alpha: 0.75))),
+                    if (w != null) _WeatherChip(w: w),
+                  ],
+                ),
                 const SizedBox(height: 2),
                 SizedBox(
                   width: 270,
@@ -461,21 +478,33 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                 ),
               ),
             ),
-          PaceCard(
+          GlassCard(
+            tint: 0.6,
             padding: EdgeInsets.zero,
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.category_outlined),
-                  title: const Text('Tipo de treino'),
-                  trailing: DropdownButton<String>(
-                    value: _type,
-                    underline: const SizedBox(),
-                    items: trainingTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                    onChanged: (v) => setState(() => _type = v ?? _type),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 0, 4),
+                  child: Text('Tipo de treino', style: glassTheme.textTheme.titleSmall),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  child: Row(
+                    children: [
+                      for (final ty in trainingTypes)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _TypePill(
+                            text: ty,
+                            selected: ty == _type,
+                            onTap: () => setState(() => _type = ty),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const Divider(height: 1),
+                Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: Column(
@@ -483,27 +512,24 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
                     children: [
                       Text('Meta', style: glassTheme.textTheme.titleSmall),
                       const SizedBox(height: 8),
-                      SegmentedButton<GoalType>(
-                        showSelectedIcon: false,
-                        segments: const [
-                          ButtonSegment(value: GoalType.none, label: Text('Livre')),
-                          ButtonSegment(value: GoalType.distance, label: Text('Distância')),
-                          ButtonSegment(value: GoalType.time, label: Text('Tempo')),
+                      GoalModePicker<GoalType>(
+                        options: const [
+                          (GoalType.none, 'Livre', Icons.all_inclusive_rounded),
+                          (GoalType.distance, 'Distância', Icons.straighten_rounded),
+                          (GoalType.time, 'Tempo', Icons.timer_outlined),
                         ],
-                        selected: {_goal},
-                        onSelectionChanged: (s) => setState(() => _goal = s.first),
+                        value: _goal,
+                        onChanged: (g) => setState(() => _goal = g),
                       ),
                       if (_goal == GoalType.distance)
-                        _Stepper(
-                          label: '${_goalKm.toStringAsFixed(_goalKm == _goalKm.roundToDouble() ? 0 : 1).replaceAll('.', ',')} km',
-                          onMinus: _goalKm > 1 ? () => setState(() => _goalKm -= _goalKm > 10 ? 1 : 0.5) : null,
-                          onPlus: _goalKm < 100 ? () => setState(() => _goalKm += _goalKm >= 10 ? 1 : 0.5) : null,
-                        ),
+                        GoalEditor(byTime: false, value: _goalKm, onChanged: (v) => setState(() => _goalKm = v)),
                       if (_goal == GoalType.time)
-                        _Stepper(
-                          label: '$_goalMin min',
-                          onMinus: _goalMin > 5 ? () => setState(() => _goalMin -= 5) : null,
-                          onPlus: _goalMin < 300 ? () => setState(() => _goalMin += 5) : null,
+                        GoalEditor(byTime: true, value: _goalMin.toDouble(), onChanged: (v) => setState(() => _goalMin = v.round())),
+                      if (_goal == GoalType.none)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text('Sem alvo: corra o quanto quiser e encerre quando der.',
+                              style: TextStyle(fontSize: 12.5, color: const Pal(true).muted)),
                         ),
                     ],
                   ),
@@ -512,7 +538,8 @@ class _RunSetupScreenState extends State<RunSetupScreen> with WidgetsBindingObse
             ),
           ),
           const SectionTitle('Durante a corrida'),
-          PaceCard(
+          GlassCard(
+            tint: 0.6,
             padding: EdgeInsets.zero,
             child: Column(
               children: [
@@ -936,28 +963,71 @@ class _BlinkState extends State<_Blink> with SingleTickerProviderStateMixin {
       );
 }
 
-class _Stepper extends StatelessWidget {
-  final String label;
-  final VoidCallback? onMinus;
-  final VoidCallback? onPlus;
-  const _Stepper({required this.label, this.onMinus, this.onPlus});
+/// Pílula do tipo de treino.
+class _TypePill extends StatelessWidget {
+  final String text;
+  final bool selected;
+  final VoidCallback onTap;
+  const _TypePill({required this.text, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton.filledTonal(onPressed: onMinus, icon: const Icon(Icons.remove)),
-          SizedBox(
-            width: 120,
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-          ),
-          IconButton.filledTonal(onPressed: onPlus, icon: const Icon(Icons.add)),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? Colors.white : Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: Text(text,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13.5,
+              color: selected ? PaceColors.ink : Colors.white.withValues(alpha: 0.85),
+            )),
+      ),
+    );
+  }
+}
+
+/// Clima agora, ao lado do dia da semana.
+class _WeatherChip extends StatelessWidget {
+  final WeatherNow w;
+  const _WeatherChip({required this.w});
+
+  IconData get _icon => switch (w.kind) {
+        WeatherKind.clear => w.hot ? Icons.wb_sunny_rounded : Icons.wb_sunny_outlined,
+        WeatherKind.partly => Icons.wb_cloudy_outlined,
+        WeatherKind.cloudy => Icons.cloud_rounded,
+        WeatherKind.fog => Icons.foggy,
+        WeatherKind.drizzle => Icons.grain_rounded,
+        WeatherKind.rain => Icons.umbrella_rounded,
+        WeatherKind.storm => Icons.thunderstorm_rounded,
+        WeatherKind.snow => Icons.ac_unit_rounded,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Tempo agora: ${w.label}, ${w.tempC.round()} graus',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_icon, size: 15, color: PaceColors.mintDark),
+            const SizedBox(width: 4),
+            Text('${w.tempC.round()}° · ${w.label}${w.windy && !w.wet ? ' · vento' : ''}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: PaceColors.ink)),
+          ],
+        ),
       ),
     );
   }

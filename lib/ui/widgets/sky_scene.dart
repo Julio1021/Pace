@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../core/theme.dart';
+import '../../services/weather.dart';
 import 'pace_ui.dart';
 
 /// Momentos do dia mostrados no céu da tela Correr.
@@ -125,7 +126,70 @@ class SkyInfo {
   final SunTimes sun;
   final SkyMoment moment;
   final SkyLook look;
-  const SkyInfo(this.now, this.sun, this.moment, this.look);
+
+  /// Tempo agora (null = sem previsão; o céu fica só pelo horário).
+  final WeatherNow? weather;
+  const SkyInfo(this.now, this.sun, this.moment, this.look, [this.weather]);
+
+  /// Quanto o céu está fechado (0 limpo … 1 tempestade).
+  double get overcast => switch (weather?.kind) {
+        null || WeatherKind.clear => 0,
+        WeatherKind.partly => 0.18,
+        WeatherKind.cloudy => 0.55,
+        WeatherKind.fog => 0.5,
+        WeatherKind.snow => 0.55,
+        WeatherKind.drizzle => 0.62,
+        WeatherKind.rain => 0.78,
+        WeatherKind.storm => 0.95,
+      };
+
+  /// Chuva: 0 nada, 0,35 garoa, 1 chuva, 1,6 tempestade.
+  double get rain => switch (weather?.kind) {
+        WeatherKind.drizzle => 0.35,
+        WeatherKind.rain => 1.0,
+        WeatherKind.storm => 1.6,
+        _ => 0,
+      };
+
+  double get fog => switch (weather?.kind) {
+        WeatherKind.fog => 1.0,
+        WeatherKind.drizzle => 0.35,
+        WeatherKind.rain => 0.2,
+        _ => 0,
+      };
+
+  double get wind => (weather?.windy ?? false) ? 2.6 : (weather?.kind == WeatherKind.storm ? 2.0 : 1.0);
+
+  /// Aplica o tempo sobre o céu do horário (a paisagem continua a mesma).
+  SkyInfo withWeather(WeatherNow? w) {
+    if (w == null) return this;
+    final base = SkyInfo(now, sun, moment, look, w);
+    final o = base.overcast;
+    final wet = w.wet;
+    Color grey(Color c, double k) {
+      final l = c.computeLuminance();
+      final g = Color.lerp(const Color(0xFF3A4556), const Color(0xFFDDE4EC), l.clamp(0.0, 1.0))!;
+      var out = Color.lerp(c, g, k)!;
+      if (wet) out = Color.lerp(out, const Color(0xFF2F3A4A), 0.18 * k)!;
+      return out;
+    }
+
+    final l = look;
+    final nl = SkyLook(
+      top: grey(l.top, o * 0.85),
+      mid: grey(l.mid, o * 0.85),
+      low: grey(l.low, o * 0.8),
+      hillFar: grey(l.hillFar, o * 0.45),
+      hillMid: grey(l.hillMid, o * 0.4),
+      hillNear: grey(l.hillNear, o * 0.3),
+      ground: grey(l.ground, o * 0.25),
+      sun: w.hot ? const Color(0xFFFFB347) : l.sun,
+      cloud: Color.lerp(l.cloud, wet ? const Color(0xFFAEB8C4) : const Color(0xFFE6EBF0), o)!,
+      cloudAlpha: math.max(l.cloudAlpha, o <= 0 ? 0 : 0.45 + 0.5 * o),
+      stars: l.stars * (1 - o),
+    );
+    return SkyInfo(now, sun, moment, nl, w);
+  }
 
   /// Lugar padrão quando ainda não há corrida com GPS (Vale do Paraíba).
   static const defaultLat = -22.81;
@@ -184,6 +248,8 @@ class SkyInfo {
       };
 
   String get phrase {
+    final wp = weather?.phrase;
+    if (wp != null) return wp;
     final list = switch (moment) {
       SkyMoment.aurora => ['Ar fresquinho lá fora. Bora?', 'Ainda está escuro: vá de roupa clara.'],
       SkyMoment.sunrise => ['O dia está nascendo. Bora?', 'Começar o dia correndo é outro nível.'],
@@ -310,6 +376,7 @@ class _ScenePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size s) {
     final t = time.value;
+    _sunAt = null;
     final sc = scroll.value.clamp(0.0, 2000.0);
     final l = info.look;
     final mo = info.moment;
@@ -399,7 +466,7 @@ class _ScenePainter extends CustomPainter {
     }
 
     // Lua (fase real; no hemisfério sul a parte iluminada inverte).
-    if (mo == SkyMoment.night || mo == SkyMoment.dusk || mo == SkyMoment.aurora) {
+    if ((mo == SkyMoment.night || mo == SkyMoment.dusk || mo == SkyMoment.aurora) && info.overcast < 0.6) {
       _moon(canvas, Offset(w * 0.8, 120), 30, l, t);
     }
 
@@ -409,7 +476,7 @@ class _ScenePainter extends CustomPainter {
     final p = span <= 0 ? 0.5 : info.now.difference(sr).inSeconds / span;
     if (p > -0.04 && p < 1.04) {
       final elev = math.sin(math.pi * p.clamp(0.0, 1.0));
-      final top = 105.0;
+      final top = 170.0;
       final low = horizon + 26;
       // Perto do horizonte o sol fica mais à direita, para não sumir atrás do botão.
       final c = Offset(w * (0.8 + 0.08 * (1 - elev)), low - (low - top) * math.pow(elev, 0.75));
@@ -432,18 +499,28 @@ class _ScenePainter extends CustomPainter {
         }
         canvas.restore();
       }
+      _sunAt = c;
+      _sunR = r * 1.9;
+      final vis = (1 - info.overcast * 1.05).clamp(0.0, 1.0);
+      final hot = info.weather?.hot ?? false;
+      final rr = hot ? r * 1.2 : r;
       final pulse = 1 + 0.04 * math.sin(t * 1.3);
-      canvas.drawCircle(c, r * 2.3 * pulse, Paint()..color = l.sun.withValues(alpha: 0.12));
-      canvas.drawCircle(c, r * 1.55 * pulse, Paint()..color = l.sun.withValues(alpha: 0.2));
-      canvas.drawCircle(
-        c,
-        r,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-0.3, -0.3),
-            colors: [Color.lerp(l.sun, Colors.white, 0.45)!, l.sun],
-          ).createShader(Rect.fromCircle(center: c, radius: r)),
-      );
+      if (vis > 0.01) {
+        canvas.drawCircle(c, rr * 2.3 * pulse, Paint()..color = l.sun.withValues(alpha: 0.12 * vis));
+        canvas.drawCircle(c, rr * 1.55 * pulse, Paint()..color = l.sun.withValues(alpha: 0.2 * vis));
+        canvas.drawCircle(
+          c,
+          rr,
+          Paint()
+            ..shader = RadialGradient(
+              center: const Alignment(-0.3, -0.3),
+              colors: [
+                Color.lerp(l.sun, Colors.white, 0.45)!.withValues(alpha: vis),
+                l.sun.withValues(alpha: vis),
+              ],
+            ).createShader(Rect.fromCircle(center: c, radius: rr)),
+        );
+      }
     }
 
     // Nuvens em camadas, cada uma numa velocidade.
@@ -454,17 +531,33 @@ class _ScenePainter extends CustomPainter {
         (y: 90.0, s: 0.55, v: 3.0, o: 0.75),
         (y: 300.0, s: 0.85, v: 6.0, o: 0.2),
       ];
-      for (final c in specs) {
+      final o = info.overcast;
+      final extra = o >= 0.5
+          ? [
+              (y: 60.0, s: 1.2, v: 5.0, o: 0.3),
+              (y: 190.0, s: 1.1, v: 6.5, o: 0.6),
+              (y: 120.0, s: 1.3, v: 4.0, o: 0.9),
+              (y: 270.0, s: 1.0, v: 5.5, o: 0.1),
+            ]
+          : const <({double y, double s, double v, double o})>[];
+      for (final c in [...specs, ...extra]) {
         final span = w + 260;
-        final x = ((c.o * span + t * c.v) % span) - 160;
-        _cloud(canvas, Offset(x, c.y), c.s, l.cloud.withValues(alpha: l.cloudAlpha * (0.6 + 0.4 * c.s)));
+        final x = ((c.o * span + t * c.v * info.wind) % span) - 160;
+        final sc = c.s * (1 + o * 0.35);
+        _cloud(canvas, Offset(x, c.y), sc, l.cloud.withValues(alpha: (l.cloudAlpha * (0.6 + 0.4 * c.s)).clamp(0.0, 1.0)));
+      }
+      // Nuvens de chuva: base mais escura.
+      if (info.rain > 0) {
+        canvas.drawRect(Rect.fromLTWH(0, 0, w, horizon * 0.55),
+            Paint()..color = const Color(0xFF2B3442).withValues(alpha: 0.10 + 0.08 * info.rain));
       }
     }
 
-    // Rajadas de vento.
-    if (mo == SkyMoment.day || mo == SkyMoment.sunrise) {
-      for (var i = 0; i < 3; i++) {
-        final k = ((t * 0.12 + i * 0.37) % 1);
+    // Rajadas de vento (mais e mais rápidas com vento forte).
+    if (mo == SkyMoment.day || mo == SkyMoment.sunrise || info.wind > 1.5) {
+      final n = info.wind > 1.5 ? 5 : 3;
+      for (var i = 0; i < n; i++) {
+        final k = ((t * 0.12 * info.wind + i * 0.37) % 1);
         if (k > 0.55) continue;
         final q = k / 0.55;
         final x0 = -120 + q * (w + 240);
@@ -488,7 +581,9 @@ class _ScenePainter extends CustomPainter {
     final birdColor = info.onSky == Colors.white
         ? Colors.white.withValues(alpha: 0.75)
         : Color.lerp(PaceColors.ink, l.top, 0.35)!.withValues(alpha: 0.7);
-    if (mo == SkyMoment.sunrise) {
+    if (info.rain > 0 || info.overcast >= 0.75) {
+      // Com chuva as aves se abrigam.
+    } else if (mo == SkyMoment.sunrise) {
       final k = (t / 28) % 1;
       final bx = -90 + k * (w + 180), by = 270 - k * 110;
       const v = [(0.0, 0.0), (-22.0, 13.0), (22.0, 13.0), (-44.0, 26.0), (44.0, 26.0), (-66.0, 39.0)];
@@ -510,6 +605,16 @@ class _ScenePainter extends CustomPainter {
     }
     canvas.restore();
 
+    // Relâmpago (tempestade), bem rápido e raro.
+    if ((info.weather?.kind == WeatherKind.storm)) {
+      final cyc = (t / 7).floor();
+      final k = t % 7 - _r(cyc + 500) * 5;
+      if (k > 0 && k < 0.35) {
+        final a = (k < 0.08 ? 1.0 : (k < 0.16 ? 0.3 : (k < 0.22 ? 0.8 : (0.35 - k) / 0.13))).clamp(0.0, 1.0);
+        canvas.drawRect(Offset.zero & s, Paint()..color = Colors.white.withValues(alpha: 0.35 * a));
+      }
+    }
+
     // Morros (três camadas) e chão.
     _hill(canvas, w, hz - 6, 18, 0.0, l.hillFar, s.height);
     // Névoa de manhãzinha entre os morros.
@@ -521,6 +626,19 @@ class _ScenePainter extends CustomPainter {
       }
     }
     _hill(canvas, w, hz + 32, 22, 1.7, l.hillMid, s.height);
+    // Arvorezinhas no morro do meio.
+    final tree = Paint()..color = Color.lerp(l.hillMid, Colors.black, 0.22)!;
+    final trunk = Paint()
+      ..color = Color.lerp(l.hillMid, Colors.black, 0.4)!
+      ..strokeWidth = 2;
+    for (final (fx, sz) in [(0.08, 1.0), (0.13, 0.75), (0.31, 0.9), (0.57, 0.7), (0.62, 1.05), (0.9, 0.85)]) {
+      final x = w * fx;
+      final y = _hillY(x, w, hz + 32, 22, 1.7) + 3;
+      final sway = math.sin(t * 1.1 * info.wind + fx * 9) * 1.2 * info.wind;
+      canvas.drawLine(Offset(x, y), Offset(x, y - 8 * sz), trunk);
+      canvas.drawOval(Rect.fromCenter(center: Offset(x + sway, y - 14 * sz), width: 15 * sz, height: 19 * sz), tree);
+      canvas.drawOval(Rect.fromCenter(center: Offset(x + sway * 1.2 - 3 * sz, y - 19 * sz), width: 10 * sz, height: 12 * sz), tree);
+    }
     final nearY = hz + 78;
     _hill(canvas, w, nearY, 16, 3.1, l.hillNear, s.height);
     canvas.drawRect(
@@ -534,6 +652,27 @@ class _ScenePainter extends CustomPainter {
         ).createShader(Rect.fromLTWH(0, nearY + 40, w, 260)),
     );
 
+    // Trilha de corrida descendo do morro.
+    final trailTop = Offset(w * 0.64, _hillY(w * 0.64, w, nearY, 16, 3.1) + 6);
+    final trail = Path()
+      ..moveTo(trailTop.dx - 3, trailTop.dy)
+      ..cubicTo(w * 0.5, nearY + 70, w * 0.86, nearY + 120, w * 0.6, s.height)
+      ..lineTo(w * 0.78, s.height)
+      ..cubicTo(w * 1.02, nearY + 120, w * 0.56, nearY + 70, trailTop.dx + 3, trailTop.dy)
+      ..close();
+    canvas.drawPath(
+      trail,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.lerp(l.ground, const Color(0xFFE9D9B8), 0.55)!.withValues(alpha: 0.55),
+            Color.lerp(l.ground, const Color(0xFFE9D9B8), 0.65)!.withValues(alpha: 0.9),
+          ],
+        ).createShader(Rect.fromLTWH(0, trailTop.dy, w, s.height - trailTop.dy)),
+    );
+
     // Tufos de capim balançando com o vento no morro da frente.
     final grass = Paint()
       ..color = Color.lerp(l.hillNear, Colors.black, 0.12)!
@@ -543,7 +682,7 @@ class _ScenePainter extends CustomPainter {
       gi++;
       if (_r(gi + 2100) < 0.25) continue;
       final base = Offset(x, _hillY(x, w, nearY, 16, 3.1) + 4);
-      final wind = math.sin(t * 1.3 + x * 0.03) * 0.5 + 0.35;
+      final wind = (math.sin(t * 1.3 * info.wind + x * 0.03) * 0.5 + 0.35) * (0.7 + 0.3 * info.wind);
       final blades = 3 + (_r(gi + 2200) * 3).floor();
       for (var b = 0; b < blades; b++) {
         final ang = (b - (blades - 1) / 2) * 0.32;
@@ -560,8 +699,60 @@ class _ScenePainter extends CustomPainter {
       }
     }
 
+    // Névoa (neblina/garoa) passando sobre os morros.
+    if (info.fog > 0) {
+      final m = Paint()..color = Colors.white.withValues(alpha: 0.22 * info.fog);
+      for (var i = 0; i < 5; i++) {
+        final x = ((t * 9 + i * 230) % (w + 520)) - 260;
+        canvas.drawOval(Rect.fromCenter(center: Offset(x, hz - 10 + i * 26), width: 380, height: 40), m);
+      }
+    }
+
+    // Ar tremulando no calor.
+    if (info.weather?.hot ?? false) {
+      final hp = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = Colors.white.withValues(alpha: 0.16);
+      for (var i = 0; i < 5; i++) {
+        final path = Path();
+        for (double x = 0; x <= w; x += 8) {
+          final y = hz + 4 + i * 10 + math.sin(x * 0.05 + t * 3 + i) * 2.5;
+          x == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+        }
+        canvas.drawPath(path, hp);
+      }
+    }
+
+    // Chuva caindo inclinada pelo vento, com respingos no chão.
+    if (info.rain > 0) {
+      final heavy = info.rain >= 1;
+      final drop = Paint()
+        ..strokeWidth = heavy ? 1.8 : 1.2
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white.withValues(alpha: heavy ? 0.5 : 0.42);
+      final splash = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: 0.35);
+      final n = (110 * info.rain.clamp(0.0, 1.4)).round().clamp(30, 150);
+      final slant = 0.18 * info.wind;
+      for (var i = 0; i < n; i++) {
+        final speed = (heavy ? 760.0 : 300.0) * (0.75 + _r(i + 3000) * 0.5);
+        final len = (heavy ? 18.0 : 9.0) * (0.7 + _r(i + 3100) * 0.6);
+        final y = (_r(i + 3200) * s.height + t * speed) % s.height;
+        final x = (_r(i + 3300) * (w + 80) + y * slant) % (w + 80) - 40;
+        canvas.drawLine(Offset(x, y), Offset(x + len * slant, y + len), drop);
+        // Respingo quando a gota chega perto do chão.
+        final gy = nearY + 50 + _r(i + 3400) * 120;
+        if ((y - gy).abs() < 6 && i.isEven) {
+          canvas.drawOval(Rect.fromCenter(center: Offset(x, gy + 4), width: 10, height: 3), splash);
+        }
+      }
+    }
+
     // Vaga-lumes.
-    if (mo == SkyMoment.night || mo == SkyMoment.dusk) {
+    if ((mo == SkyMoment.night || mo == SkyMoment.dusk) && info.rain <= 0) {
       final amount = mo == SkyMoment.night ? 1.0 : 0.5;
       for (var i = 0; i < 16; i++) {
         final a = math.max(0.0, math.sin(t * (0.9 + _r(i + 40) * 0.8) + i * 2.1));
@@ -603,6 +794,9 @@ class _ScenePainter extends CustomPainter {
   }
 
   void _bird(Canvas canvas, Offset c, double s, double phase, Color color) {
+    // Não passa na frente do sol (virava uma "carinha triste").
+    final sc = _sunAt;
+    if (sc != null && (c - sc).distance < _sunR + s) return;
     final f = math.sin(phase) * s * 0.55;
     final path = Path()
       ..moveTo(c.dx - s, c.dy - f)
@@ -656,4 +850,8 @@ class _ScenePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ScenePainter o) => o.info != info || o.horizon != horizon;
+
+  // Onde está o sol (para as aves desviarem dele).
+  Offset? _sunAt;
+  double _sunR = 0;
 }

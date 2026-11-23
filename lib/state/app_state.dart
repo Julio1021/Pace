@@ -13,6 +13,7 @@ import '../domain/records.dart';
 import '../domain/reminders.dart';
 import '../domain/stats.dart';
 import '../services/run_notification.dart';
+import '../services/weather.dart';
 
 /// Treino do plano escolhido para a próxima corrida (preenche a tela Correr).
 class RunPreset {
@@ -54,6 +55,28 @@ class AppState extends ChangeNotifier {
 
   /// Lembretes agendados.
   ReminderSettings reminders = const ReminderSettings();
+
+  /// Tempo agora (para o céu da tela Correr).
+  WeatherNow? weather;
+  bool _weatherBusy = false;
+
+  /// Atualiza a previsão se tiver mais de 30 min (sem internet, mantém a anterior).
+  Future<void> refreshWeather(double lat, double lon) async {
+    if (!autoBackground || _weatherBusy) return;
+    final w = weather;
+    if (w != null && DateTime.now().difference(w.fetchedAt).inMinutes < 30) return;
+    _weatherBusy = true;
+    try {
+      final n = await WeatherService.fetch(lat, lon);
+      if (n != null) {
+        weather = n;
+        notifyListeners();
+        await db.setKv('weather', jsonEncode(n.toJson()));
+      }
+    } finally {
+      _weatherBusy = false;
+    }
+  }
 
   PaceDatabase get db => _db!;
 
@@ -100,6 +123,14 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       plan = null;
     }
+    try {
+      final wr = await db.getKv('weather');
+      if (wr != null) {
+        final w = WeatherNow.fromJson(jsonDecode(wr) as Map<String, dynamic>);
+        // Previsão guardada só vale por 3 horas.
+        if (w != null && DateTime.now().difference(w.fetchedAt).inHours < 3) weather = w;
+      }
+    } catch (_) {}
     try {
       final r = await db.getKv('reminders');
       reminders = r == null ? ReminderSettings.suggested(activities, DateTime.now()) : ReminderSettings.fromJson(jsonDecode(r) as Map<String, dynamic>);

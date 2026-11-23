@@ -68,6 +68,9 @@ class GlassCard extends StatelessWidget {
   final double radius;
   final bool blur;
 
+  /// Opacidade do vidro (1 = padrão; menor deixa o fundo aparecer mais).
+  final double tint;
+
   const GlassCard({
     super.key,
     required this.child,
@@ -75,6 +78,7 @@ class GlassCard extends StatelessWidget {
     this.onTap,
     this.radius = 24,
     this.blur = true,
+    this.tint = 1,
   });
 
   @override
@@ -95,10 +99,13 @@ class GlassCard extends StatelessWidget {
     final tinted = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: r,
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xD6222934), Color(0xE6121720)],
+          colors: [
+            const Color(0xFF222934).withValues(alpha: 0.84 * tint),
+            const Color(0xFF121720).withValues(alpha: 0.9 * tint),
+          ],
         ),
       ),
       child: DecoratedBox(

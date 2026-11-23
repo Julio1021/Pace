@@ -24,6 +24,7 @@ import 'package:pace/domain/achievements.dart';
 import 'package:pace/domain/plans.dart';
 import 'package:pace/ui/widgets/achievement_widgets.dart';
 import 'package:pace/ui/widgets/share_card.dart';
+import 'package:pace/services/weather.dart';
 import 'package:pace/ui/screens/home_screen.dart';
 import 'package:pace/ui/screens/reminders_screen.dart';
 import 'package:pace/ui/screens/records_screen.dart';
@@ -237,6 +238,30 @@ void main() {
       await _settle(tester);
       await _tab(tester, 'Correr');
       await _shot(tester, '05-correr-${e.key}', height: 900);
+    }
+    RunSetupScreen.clock = DateTime.now;
+  }, skip: !_enabled);
+
+  testWidgets('05c céu com o tempo e meta editável', (tester) async {
+    final sun = SunTimes.of(DateTime.now(), SkyInfo.defaultLat, SkyInfo.defaultLon);
+    RunSetupScreen.clock = () => sun.sunrise.add(const Duration(hours: 4));
+    final cases = <String, WeatherNow>{
+      'chuva': WeatherNow(kind: WeatherKind.rain, tempC: 18, windKmh: 14, fetchedAt: DateTime.now()),
+      'tempestade': WeatherNow(kind: WeatherKind.storm, tempC: 17, windKmh: 30, fetchedAt: DateTime.now()),
+      'neblina': WeatherNow(kind: WeatherKind.fog, tempC: 14, windKmh: 3, fetchedAt: DateTime.now()),
+      'nublado': WeatherNow(kind: WeatherKind.cloudy, tempC: 21, windKmh: 8, fetchedAt: DateTime.now()),
+    };
+    for (final e in cases.entries) {
+      final env = await _makeEnv(tester);
+      env.app.weather = e.value;
+      await tester.pumpWidget(_wrap(env, const HomeShell()));
+      await _settle(tester);
+      await _tab(tester, 'Correr');
+      if (e.key == 'chuva') {
+        await tester.tap(find.text('Distância'));
+        await _settle(tester);
+      }
+      await _shot(tester, '05-correr-clima-${e.key}', height: e.key == 'chuva' ? 1250 : 900);
     }
     RunSetupScreen.clock = DateTime.now;
   }, skip: !_enabled);
