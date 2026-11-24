@@ -33,7 +33,7 @@ import 'package:pace/ui/screens/plans_screen.dart';
 import 'package:pace/ui/screens/achievements_screen.dart';
 import 'package:pace/ui/screens/import_screen.dart';
 import 'package:pace/ui/screens/live_run_screen.dart';
-import 'package:pace/ui/screens/profile_edit_screen.dart';
+import 'package:pace/ui/screens/onboarding_screen.dart';
 import 'package:pace/ui/screens/run_setup_screen.dart';
 import 'package:pace/ui/shell.dart';
 import 'package:pace/ui/widgets/route_widgets.dart';
@@ -176,8 +176,27 @@ void main() {
 
   testWidgets('01 boas-vindas', (tester) async {
     final env = await _makeEnv(tester, withData: false, withProfile: false);
-    await tester.pumpWidget(_wrap(env, const ProfileEditScreen(onboarding: true)));
+    await tester.pumpWidget(_wrap(env, const OnboardingScreen()));
     await _shot(tester, '01-boas-vindas');
+    await tester.tap(find.text('Vamos começar'));
+    await _settle(tester);
+    await tester.enterText(find.byType(TextField), 'Júlio César');
+    await _settle(tester);
+    await _shot(tester, '01b-cadastro-nome');
+    await tester.tap(find.text('Continuar'));
+    await _settle(tester);
+    await _shot(tester, '01c-cadastro-voce');
+    await tester.tap(find.text('Continuar'));
+    await _settle(tester);
+    await tester.tap(find.text('Intermediário'));
+    await _settle(tester);
+    await _shot(tester, '01d-cadastro-nivel');
+    await tester.tap(find.text('Continuar'));
+    await _settle(tester);
+    await _shot(tester, '01e-cadastro-meta');
+    await tester.tap(find.text('Concluir'));
+    await _settle(tester);
+    await _shot(tester, '01f-cadastro-pronto');
   }, skip: !_enabled);
 
   testWidgets('02 início', (tester) async {

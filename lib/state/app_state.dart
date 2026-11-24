@@ -165,7 +165,8 @@ class AppState extends ChangeNotifier {
   }
 
   /// Abre o login no navegador e espera a volta para o app.
-  Future<void> connectPCloud() async {
+  /// [backupNow]: envia um backup logo após conectar (desligado ao restaurar num celular novo).
+  Future<void> connectPCloud({bool backupNow = true}) async {
     cloudError = null;
     cloudBusy = true;
     notifyListeners();
@@ -179,7 +180,7 @@ class AppState extends ChangeNotifier {
       await _saveCloud();
       cloudBusy = false;
       notifyListeners();
-      await backupToCloud();
+      if (backupNow && allActivities.isNotEmpty) await backupToCloud();
     } catch (e) {
       cloudError = '$e';
     } finally {
@@ -246,7 +247,8 @@ class AppState extends ChangeNotifier {
 
   /// Automático: depois de uma corrida nova ou se passou uma semana.
   Future<void> _autoCloudBackup() async {
-    if (pcloud == null || !cloudAuto || cloudBusy) return;
+    // Nunca envia backup vazio (celular novo ainda sem treinos).
+    if (pcloud == null || !cloudAuto || cloudBusy || allActivities.isEmpty) return;
     final last = lastCloudBackup;
     final changed = allActivities.length != _lastCloudCount;
     final old = last == null || DateTime.now().difference(last).inDays >= 7;

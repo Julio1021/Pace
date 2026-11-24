@@ -10,7 +10,7 @@ import 'ui/widgets/guara_art.dart';
 import 'services/recorder.dart';
 import 'state/app_state.dart';
 import 'ui/intro_overlay.dart';
-import 'ui/screens/profile_edit_screen.dart';
+import 'ui/screens/onboarding_screen.dart';
 import 'ui/shell.dart';
 
 class PaceApp extends StatelessWidget {
@@ -79,7 +79,7 @@ class _RootGateState extends State<RootGate> with WidgetsBindingObserver {
     if (app.error != null) {
       return Scaffold(body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(app.error!))));
     }
-    if (!app.profile.isComplete) return const ProfileEditScreen(onboarding: true);
+    if (!app.profile.isComplete) return const OnboardingScreen();
     return Stack(
       children: [
         const HomeShell(),
