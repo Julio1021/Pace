@@ -557,7 +557,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 18),
                 const _Features(items: [
-                  (Icons.ios_share_rounded, 'Já corre com outro app?', 'Importe seus treinos em Perfil › Importar'),
+                  (Icons.ios_share_rounded, 'Já corre com outro app?', 'Traga seu histórico em Perfil › Importar histórico'),
                   (Icons.directions_bike_rounded, 'Também pedala?', 'Troque para Pedal na tela de treino'),
                 ]),
                 const Spacer(),
