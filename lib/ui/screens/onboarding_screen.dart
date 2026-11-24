@@ -311,7 +311,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPressed: _busy ? null : _restoreSheet,
                     icon: const Icon(Icons.restore_rounded, size: 18),
                     label: const Text('Já uso o PACE · restaurar backup'),
-                    style: TextButton.styleFrom(foregroundColor: PaceColors.mintDark, textStyle: const TextStyle(fontWeight: FontWeight.w700)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: PaceColors.mintDark,
+                      textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ],
@@ -702,7 +705,8 @@ class _PrimaryButton extends StatelessWidget {
           disabledBackgroundColor: PaceColors.mint.withValues(alpha: 0.3),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          // Usa a fonte do app (sem família definida o texto cai na fonte do sistema).
+          textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17, fontWeight: FontWeight.w800),
           elevation: onTap == null ? 0 : 3,
           shadowColor: PaceColors.mint.withValues(alpha: 0.5),
         ),
